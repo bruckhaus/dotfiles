@@ -1,0 +1,9 @@
+[user]
+	name = Tilmann Bruckhaus
+	email = Tilmann.Bruckhaus@mail.mcgill.ca
+[color]
+	ui = true
+[color]
+  diff = auto
+  status = auto
+  branch = auto
