@@ -1,6 +1,6 @@
 #!/bin/sh
 DISABLE_UPDATE_PROMPT=true
-export SSL_CERT_FILE=/usr/local/etc/cacert.pem
+## export SSL_CERT_FILE=/usr/local/etc/cacert.pem
 
 # Path to your oh-my-zsh configuration.
 ZSH=$HOME/.oh-my-zsh
@@ -66,3 +66,4 @@ SCALA_HOME=/usr/share/scala; export SCALA_HOME
 PATH=$SCALA_HOME/bin:$PATH; export PATH
 
 SPARK_HOME=/Users/tilmannbruckhaus/dev/spark-1.2.0-bin-hadoop2.4; export SPARK_HOME
+export PATH="/usr/local/sbin:$PATH"
