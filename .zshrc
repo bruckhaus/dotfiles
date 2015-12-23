@@ -22,7 +22,7 @@ alias gb="git branch"
 alias gco="git checkout"
 alias gdd="git --no-pager diff"
 alias gddc="git --no-pager diff --cached"
-alias gt="git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)"
+alias gt='git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)'
 alias pull="git pull"
 alias push="git push"
 
