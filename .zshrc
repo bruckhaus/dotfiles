@@ -25,6 +25,7 @@ alias gddc="git --no-pager diff --cached"
 alias gt='git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)'
 alias pull="git pull"
 alias push="git push"
+alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref HEAD)'
 
 # Set to this to use case-sensitive completion
 # CASE_SENSITIVE="true"
