@@ -45,6 +45,7 @@ alias gnp='git --no-pager log --pretty=oneline origin/`gbn`..`gbn`'
 alias gcon='git shortlog -s -n --no-merges'
 alias gbn='git rev-parse --abbrev-ref HEAD'
 alias gpom="git pull origin master"
+alias gpod="git pull origin develop"
 alias gb="git branch"
 alias gco="git checkout"
 #alias gdd="git --no-pager diff"
