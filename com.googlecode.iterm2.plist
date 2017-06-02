@@ -12,8 +12,12 @@
 	<integer>1</integer>
 	<key>Default Bookmark Guid</key>
 	<string>CD1D3DA8-6554-4457-9CD9-586CBB22D1BB</string>
+	<key>DisableWindowSizeSnap</key>
+	<true/>
 	<key>FocusFollowsMouse</key>
 	<true/>
+	<key>HideScrollbar</key>
+	<false/>
 	<key>LoadPrefsFromCustomFolder</key>
 	<true/>
 	<key>NSNavLastRootDirectory</key>
@@ -59,9 +63,9 @@
 	<key>NSWindow Frame NSFontPanel</key>
 	<string>1169 110 445 493 0 0 1680 1027 </string>
 	<key>NSWindow Frame SharedPreferences</key>
-	<string>388 336 796 473 0 0 1680 1027 </string>
+	<string>971 723 796 473 0 0 3008 1669 </string>
 	<key>NSWindow Frame iTerm Window 0</key>
-	<string>0 12 1674 1015 0 0 1680 1027 </string>
+	<string>0 31 1674 996 0 0 3008 1669 </string>
 	<key>NSWindow Frame iTerm Window 1</key>
 	<string>0 4 1680 1023 0 0 1680 1027 </string>
 	<key>New Bookmarks</key>
@@ -718,7 +722,7 @@
 	<key>SUHasLaunchedBefore</key>
 	<true/>
 	<key>SULastCheckTime</key>
-	<date>2017-05-28T03:52:47Z</date>
+	<date>2017-06-01T19:47:49Z</date>
 	<key>SUSendProfileInfo</key>
 	<false/>
 	<key>TripleClickSelectsFullWrappedLines</key>
