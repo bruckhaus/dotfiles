@@ -57,6 +57,9 @@ alias push="git push"
 alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref HEAD)'
 alias gu='git reset --soft HEAD^'
 
+# python:
+alias ptest='python -m unittest discover'
+
 # other aliases:
 alias less='less -R'
 alias ccat='pygmentize -g'
