@@ -59,6 +59,7 @@ alias gu='git reset --soft HEAD^'
 
 # python:
 alias ptest='python -m unittest discover'
+alias venv='source .env/bin/activate'
 
 # other aliases:
 alias less='less -R'
