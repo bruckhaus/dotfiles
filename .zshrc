@@ -90,8 +90,13 @@ SPARK_HOME=/Users/tilmannbruckhaus/dev/spark-1.2.0-bin-hadoop2.4; export SPARK_H
 
 # RVM:
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && . "$HOME/.rvm/scripts/rvm"  # This loads RVM into a shell session.
 PATH=$PATH:$HOME/.rvm/bin # Add RVM to PATH for scripting
 export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/gems/ruby-1.9.3-p392/bin
 export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/gems/ruby-1.9.3-p392@global/bin
 export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/rubies/ruby-1.9.3-p392/bin
 export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/bin
+
+# source local profile (company environment variables, etc.)
+export LOCAL_PROFILE=${HOME}/.local_profile
+[[ -r "${LOCAL_PROFILE}" ]] && source "${LOCAL_PROFILE}"
