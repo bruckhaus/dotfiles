@@ -55,7 +55,7 @@ alias gt='git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)'
 alias pull="git pull"
 alias push="git push"
 alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref HEAD)'
-alias gu='git reset --soft HEAD^'
+alias gu='git reset --soft HEAD\^'
 
 # python:
 alias ptest='python -m unittest discover'
