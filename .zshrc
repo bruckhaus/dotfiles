@@ -60,6 +60,7 @@ alias gu='git reset --soft HEAD\^'
 # python:
 alias ptest='python -m unittest discover'
 alias venv='source .env/bin/activate'
+export PYTHONPATH=.:$PYTHONPATH
 
 # other aliases:
 alias less='less -R'
