@@ -1,5 +1,7 @@
 #!/bin/sh
 
+source $HOME/.bash_profile
+
 # zsh:
 DISABLE_UPDATE_PROMPT=true
 # Path to your oh-my-zsh configuration.
@@ -8,9 +10,11 @@ ZSH=$HOME/.oh-my-zsh
 # Look in ~/.oh-my-zsh/themes/
 # Optionally, if you set this to "random", it'll load a random theme each
 # time that oh-my-zsh is loaded.
+ZSH_THEME="candy"
+# ZSH_THEME="bullet-train"
 # ZSH_THEME="robbyrussell"
 # ZSH_THEME="gnzh"
-ZSH_THEME="wedisagree"
+# ZSH_THEME="wedisagree"
 # Set to this to use case-sensitive completion
 # CASE_SENSITIVE="true"
 # Comment this out to disable bi-weekly auto-update checks
@@ -74,7 +78,7 @@ export PATH=$PATH:/usr/sbin
 export PATH=$PATH:/usr/local/bin
 export PATH=$PATH:/usr/local/sbin
 export PATH=$PATH:/usr/local/git/bin
-export PATH="$HOME/anaconda/bin:$PATH"
+# export PATH="$HOME/anaconda/bin:$PATH"
 
 # mysql:
 export PATH=$PATH:/usr/local/mysql/bin
