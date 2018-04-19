@@ -104,5 +104,5 @@ export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/rubies/ruby-1.9.3-p392/bin
 export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/bin
 
 # source local profile (company environment variables, etc.)
-export LOCAL_PROFILE=${HOME}/.local_profile
+export LOCAL_PROFILE=${HOME}/.local_profile.sh
 [[ -r "${LOCAL_PROFILE}" ]] && source "${LOCAL_PROFILE}"
