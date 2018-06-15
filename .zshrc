@@ -1,6 +1,8 @@
 #!/bin/sh
 
-source $HOME/.bash_profile
+if [ -f ${HOME}/.bash_profile ]; then
+   source ${HOME}/.bash_profile
+fi
 
 # zsh:
 DISABLE_UPDATE_PROMPT=true
