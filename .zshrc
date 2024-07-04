@@ -64,6 +64,7 @@ alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref 
 alias gu='git reset --soft HEAD\^'
 
 # python:
+alias python=python3
 alias ptest='python -m unittest discover'
 alias venv='source .env/bin/activate'
 export PYTHONPATH=.:$PYTHONPATH
