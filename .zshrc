@@ -45,17 +45,17 @@ source $ZSH/oh-my-zsh.sh
 # git:
 alias git=hub
 alias gs="git status"
-#alias glm='git log origin/master..HEAD --oneline | cat'
-alias glm='git --no-pager log origin/master..HEAD --pretty=oneline'
+#alias glm='git log origin/main..HEAD --oneline | cat'
+alias glm='git --no-pager log origin/main..HEAD --pretty=oneline'
 alias gnp='git --no-pager log --pretty=oneline origin/`gbn`..`gbn`'
 alias gcon='git shortlog -s -n --no-merges'
 alias gbn='git rev-parse --abbrev-ref HEAD'
-alias gpom="git pull origin master"
+alias gpom="git pull origin main"
 alias gpod="git pull origin develop"
 alias gb="git branch"
 alias gco="git checkout"
 #alias gdd="git --no-pager diff"
-alias gdd='git diff origin/master..HEAD'
+alias gdd='git diff origin/main..HEAD'
 alias gddc="git --no-pager diff --cached"
 alias gt='git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)'
 alias pull="git pull"
@@ -108,3 +108,7 @@ export PATH=$PATH:/Users/tilmannbruckhaus/.rvm/bin
 # source local profile (company environment variables, etc.)
 export LOCAL_PROFILE=${HOME}/.local_profile.sh
 [[ -r "${LOCAL_PROFILE}" ]] && source "${LOCAL_PROFILE}"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
