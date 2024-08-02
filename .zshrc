@@ -62,6 +62,7 @@ alias pull="git pull"
 alias push="git push"
 alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref HEAD)'
 alias gu='git reset --soft HEAD\^'
+alias ga="git add"
 
 # python:
 alias python=python3
@@ -72,6 +73,12 @@ export PYTHONPATH=.:$PYTHONPATH
 # other aliases:
 alias less='less -R'
 alias ccat='pygmentize -g'
+
+# Common ls aliases
+alias ll='ls -lah'
+alias la='ls -lAh'
+alias l='ls -lah'
+alias ls='ls -G'
 
 # path:
 # Customize to your needs...
