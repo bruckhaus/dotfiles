@@ -40,7 +40,20 @@ ZSH_THEME="candy"
 # Custom plugins may be added to ~/.oh-my-zsh/custom/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 plugins=(git)
-source $ZSH/oh-my-zsh.sh
+# source $ZSH/oh-my-zsh.sh
+
+# Starship
+eval "$(starship init zsh)"
+# Activate syntax highlighting
+source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+# Disable underline
+(( ${+ZSH_HIGHLIGHT_STYLES} )) || typeset -A ZSH_HIGHLIGHT_STYLES
+ZSH_HIGHLIGHT_STYLES[path]=none
+ZSH_HIGHLIGHT_STYLES[path_prefix]=none
+# Activate autosuggestions
+source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+# Allow changing directories without typing 'cd'
+setopt AUTO_CD
 
 # git:
 alias git=hub
@@ -63,23 +76,24 @@ alias push="git push"
 alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref HEAD)'
 alias gu='git reset --soft HEAD\^'
 alias ga="git add"
-
-# python:
-alias python=python3
-alias ptest='python -m unittest discover'
-alias venv='source .env/bin/activate'
-export PYTHONPATH=.:$PYTHONPATH
-
-# other aliases:
-alias less='less -R'
-alias ccat='pygmentize -g'
+alias gc="git commit"
 
 # Common ls aliases
 alias ll='ls -lah'
 alias la='ls -lAh'
 alias l='ls -lah'
 alias ls='ls -G'
-alias llt='ls -laht'
+
+# python:
+alias python=python3
+alias ptest='python -m unittest discover'
+alias venv='source .env/bin/activate'
+export PYTHONPATH=.:$PYTHONPATH
+export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
+
+# other aliases:
+alias less='less -R'
+alias ccat='pygmentize -g'
 
 # path:
 # Customize to your needs...
@@ -121,3 +135,9 @@ export LOCAL_PROFILE=${HOME}/.local_profile.sh
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/tilmannbruckhaus/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc'; fi
