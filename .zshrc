@@ -79,6 +79,7 @@ alias ll='ls -lah'
 alias la='ls -lAh'
 alias l='ls -lah'
 alias ls='ls -G'
+alias llt='ls -laht'
 
 # path:
 # Customize to your needs...
