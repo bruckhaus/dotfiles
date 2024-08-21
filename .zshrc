@@ -80,6 +80,7 @@ alias gc="git commit"
 
 # Common ls aliases
 alias ll='ls -lah'
+alias llt='ls -laht'
 alias la='ls -lAh'
 alias l='ls -lah'
 alias ls='ls -G'
