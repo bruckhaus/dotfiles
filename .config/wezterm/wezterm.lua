@@ -1,5 +1,6 @@
 local wezterm = require("wezterm")
 local config = {}
+local home = os.getenv("HOME") or os.getenv("USERPROFILE")
 
 if wezterm.config_builder then
   config = wezterm.config_builder()
@@ -26,7 +27,7 @@ config = {
   background = {
     {
       source = {
-        File = "/Users/tilmannbruckhaus/dev/dotfiles/img/Dome.png",
+        File = home .. "/dev/dotfiles/img/Dome.png",
       },
       hsb = {
         hue = 1.0,
