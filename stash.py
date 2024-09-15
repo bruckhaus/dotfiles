@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import shutil
 import argparse
 import time
@@ -8,19 +9,21 @@ import json
 from datetime import datetime
 import stat
 
+# Add the directory containing the script to the Python path
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, script_dir)
+
+# Import required third-party modules
 try:
     import humanize
-except ImportError:
-    print("The 'humanize' module is not installed. Please install it using 'pip install humanize'.")
-    exit(1)
-
-try:
     import randfacts
-except ImportError:
-    print("The 'randfacts' module is not installed. Please install it using 'pip install randfacts'.")
-    exit(1)
+except ImportError as e:
+    print(f"Error importing required module: {e}")
+    print("Please ensure all required modules are installed in your virtual environment.")
+    sys.exit(1)
 
-STASH_DIR_DEFAULT = os.path.expanduser('~/stash/')
+# Define default values
+STASH_DIR_DEFAULT = os.path.expanduser('~/.stash')
 STASH_LOG = os.path.join(STASH_DIR_DEFAULT, '.stash_log.json')
 VERBOSITY_DEFAULT = 'verbose'
 
@@ -253,6 +256,8 @@ def undo_stash(file_name, restore_location):
 
 
 def main():
+    working_dir = os.getcwd()
+    
     parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('file', type=str, help='File to stash or unstash')
     parser.add_argument('-s', '--stash_dir', type=str, default=STASH_DIR_DEFAULT, help='Directory to stash files')
@@ -270,9 +275,9 @@ def main():
             return
         undo_stash(args.file, args.restore_location)
     else:
-        move_to_stash(args.file, args.stash_dir, args.dry_run, args.verbosity, args.force)
+        file_path = os.path.join(working_dir, args.file)
+        move_to_stash(file_path, args.stash_dir, args.dry_run, args.verbosity, args.force)
 
 
 if __name__ == '__main__':
     main()
-    

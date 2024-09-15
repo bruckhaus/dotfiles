@@ -95,7 +95,7 @@ export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 # other aliases:
 alias less='less -R'
 alias ccat='pygmentize -g'
-alias stash='python ~/dev/dotfiles/stash.py'
+alias stash="$HOME/.local/bin/stash_wrapper.sh"
 
 # path:
 # Customize to your needs...
@@ -143,3 +143,9 @@ if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/path.zsh.inc' ]; then . '/User
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc'; fi
+
+export PATH="$HOME/.local/bin:$PATH"
+
+alias stash="/Users/tilmannbruckhaus/.local/bin/stash_wrapper.sh $(pwd)"
+
+alias stash="/Users/tilmannbruckhaus/.local/bin/stash_wrapper.sh"

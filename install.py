@@ -2,6 +2,8 @@
 
 import os
 import argparse
+import shutil
+import subprocess
 
 
 def supports_color():
@@ -17,10 +19,26 @@ def colored_output(message, color, bold=False):
         return message
 
 
+def generate_wrapper_script(install_dir, script_dir):
+    wrapper_content = f"""#!/bin/bash
+{script_dir}/venv/bin/python {script_dir}/stash.py "$@"
+"""
+    wrapper_path = os.path.join(install_dir, "stash_wrapper.sh")
+    with open(wrapper_path, 'w') as f:
+        f.write(wrapper_content)
+    os.chmod(wrapper_path, 0o755)  # Make the wrapper executable
+    return wrapper_path
+
+
 def install_files(specific_file=None, dry_run=False):
     here = os.path.dirname(os.path.realpath(__file__))
     files = ['.bash_profile', '.bashrc', '.emacs', '.gitconfig', '.zshrc', '.config/wezterm', '.config/starship.toml']
+    install_dir = os.path.expanduser("~/.local/bin")
 
+    # Ensure the installation directory exists
+    os.makedirs(install_dir, exist_ok=True)
+
+    # Install the main files
     for i in files:
         if specific_file and i != specific_file:
             continue
@@ -73,10 +91,15 @@ def install_files(specific_file=None, dry_run=False):
                 os.symlink(source_path, target_path)
                 print(colored_output(f'Created symlink for {target_path}.', 'green'))
 
+    # Generate and install the wrapper script
+    wrapper_path = generate_wrapper_script(install_dir, here)
+    print(f"\nGenerated wrapper script: {wrapper_path}")
+
     if dry_run:
         print('\nDry run complete. No changes were made.')
     else:
         print('\nInstallation complete.')
+        print("Please restart your terminal or run 'source ~/.zshrc' to use the stash command.")
 
 
 def main():
