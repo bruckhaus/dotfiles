@@ -95,6 +95,7 @@ export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 # other aliases:
 alias less='less -R'
 alias ccat='pygmentize -g'
+alias stash='python ~/dev/dotfiles/stash.py'
 
 # path:
 # Customize to your needs...
