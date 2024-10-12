@@ -54,6 +54,8 @@ ZSH_HIGHLIGHT_STYLES[path_prefix]=none
 source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 # Allow changing directories without typing 'cd'
 setopt AUTO_CD
+# Enable case-insensitive completion
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
 
 # git:
 alias git=hub
