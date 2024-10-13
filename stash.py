@@ -255,11 +255,9 @@ def undo_stash(file_name, restore_location):
         json.dump(log, f, indent=2)
 
 
-def main():
-    working_dir = os.getcwd()
-    
-    parser = argparse.ArgumentParser(description=DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('file', type=str, help='File to stash or unstash')
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Stash utility for file management")
+    parser.add_argument('file', nargs='?', help='File to stash or unstash')
     parser.add_argument('-s', '--stash_dir', type=str, default=STASH_DIR_DEFAULT, help='Directory to stash files')
     parser.add_argument('-d', '--dry_run', action='store_true', help='Perform a dry run without moving the file')
     parser.add_argument('-v', '--verbosity', choices=['silent', 'medium', 'verbose'], default=VERBOSITY_DEFAULT,
@@ -267,7 +265,12 @@ def main():
     parser.add_argument('-u', '--undo', action='store_true', help='Undo a stash action')
     parser.add_argument('-r', '--restore_location', type=str, help='Location to restore the file when using --undo')
     parser.add_argument('-f', '--force', action='store_true', help='Force stashing without confirmation prompts')
-    args = parser.parse_args()
+    
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
 
     if args.undo:
         if not args.restore_location:
@@ -275,8 +278,10 @@ def main():
             return
         undo_stash(args.file, args.restore_location)
     else:
-        file_path = os.path.join(working_dir, args.file)
-        move_to_stash(file_path, args.stash_dir, args.dry_run, args.verbosity, args.force)
+        if not args.file:
+            print("Error: No file specified")
+            return
+        move_to_stash(args.file, args.stash_dir, args.dry_run, args.verbosity, args.force)
 
 
 if __name__ == '__main__':

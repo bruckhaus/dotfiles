@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich.theme import Theme
+import sys
 
 # Constants
 
@@ -37,7 +38,22 @@ class GenerateWrapperScriptsCommand(Command):
 
     def execute(self, dry_run=False):
         here = os.path.dirname(os.path.realpath(__file__))
-        return generate_wrapper_scripts(self.install_dir, here, self.scripts, dry_run)
+        wrappers = [WrapperScript(script, self.install_dir, here) for script in self.scripts]
+        
+        wrapper_table = Table(title="Wrapper Scripts Status")
+        wrapper_table.add_column("Script", style="cyan", no_wrap=True)
+        wrapper_table.add_column("Status", style="green")
+
+        for wrapper in wrappers:
+            status = wrapper.get_status()
+            wrapper_table.add_row(wrapper.script_name, f"[{'green' if status == 'Up to date' else 'yellow'}]{status}[/{'green' if status == 'Up to date' else 'yellow'}]")
+            if status != "Up to date":
+                update_command = WrapperScriptUpdateCommand(wrapper)
+                update_command.execute(dry_run=dry_run)
+
+        console.print(wrapper_table)
+
+        return [wrapper.wrapper_path for wrapper in wrappers]
 
 class UpdateZshrcAliasesCommand(Command):
     def __init__(self, config):
@@ -83,6 +99,12 @@ class WrapperScript:
 
         return WrapperScriptUpdateCommand(self)
 
+    def get_current_content(self):
+        if os.path.exists(self.wrapper_path):
+            with open(self.wrapper_path, 'r') as f:
+                return f.read()
+        return "File does not exist"
+
 class WrapperScriptUpdateCommand(Command):
     def __init__(self, wrapper_script):
         self.wrapper_script = wrapper_script
@@ -92,17 +114,31 @@ class WrapperScriptUpdateCommand(Command):
             console.print(f"[cyan]Dry run: Would {'update' if self.wrapper_script.get_status() == 'Needs update' else 'create'} {self.wrapper_script.wrapper_path}[/cyan]")
             return
 
-        if self.wrapper_script.get_status() == "Needs update":
-            choice = console.input("Choose an option (1: Keep existing, 2: Replace with backup, 3: Replace without backup): ")
+        status = self.wrapper_script.get_status()
+        if status == "Up to date":
+            console.print("[green]✓ Wrapper script already up to date.[/green]")
+            return
+        elif status == "Needs update":
+            console.print(f"\n[bold]Updating wrapper script:[/bold] {self.wrapper_script.wrapper_name}")
+            console.print(f"[bold]Current content:[/bold]\n{self.wrapper_script.get_current_content()}")
+            console.print(f"\n[bold]New content:[/bold]\n{self.wrapper_script.wrapper_content}")
+            
+            choice = console.input("\nChoose an option (1: Keep existing, 2: Replace with backup, 3: Replace without backup): ")
             if choice == '2':
                 os.rename(self.wrapper_script.wrapper_path, self.wrapper_script.wrapper_path + '.bak')
                 console.print("[green]Backed up existing wrapper.[/green]")
+                self._update_wrapper()
             elif choice == '3':
                 console.print("[yellow]Replacing without backup.[/yellow]")
+                self._update_wrapper()
             else:
                 console.print("[yellow]Keeping existing wrapper script.[/yellow]")
-                return
+        else:  # status is "New"
+            console.print(f"\n[bold]Creating new wrapper script:[/bold] {self.wrapper_script.wrapper_name}")
+            console.print(f"[bold]Content:[/bold]\n{self.wrapper_script.wrapper_content}")
+            self._update_wrapper()
 
+    def _update_wrapper(self):
         with open(self.wrapper_script.wrapper_path, 'w') as f:
             f.write(self.wrapper_script.wrapper_content)
         os.chmod(self.wrapper_script.wrapper_path, 0o755)
@@ -311,6 +347,17 @@ def update_zshrc_aliases(dry_run=False):
     end_marker = CONFIG['settings']['zshrc_end_marker']
     aliases = CONFIG['aliases']
 
+    # Update or add the stash and unzippy aliases
+    for alias_name in ['stash', 'unzippy']:
+        alias = next((a for a in aliases if a['name'] == alias_name), None)
+        if alias:
+            alias['command'] = f"$HOME/.local/bin/{alias_name}_wrapper.sh"
+        else:
+            aliases.append({
+                'name': alias_name,
+                'command': f"$HOME/.local/bin/{alias_name}_wrapper.sh"
+            })
+
     try:
         with open(zshrc_path, 'r') as file:
             content = file.read()
@@ -373,45 +420,50 @@ custom_theme = create_custom_theme(CONFIG)
 console = Console(theme=custom_theme)
 
 def main():
-    parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
-    parser.add_argument('--dry-run', action='store_true', help='Display actions without making any changes')
-    parser.add_argument('--file', type=str, help='Specify a file to install')
-    parser.add_argument('-h', '--help', action='store_true', help='Show this help message and exit')
-    args = parser.parse_args()
+    try:
+        parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
+        parser.add_argument('--dry-run', action='store_true', help='Display actions without making any changes')
+        parser.add_argument('--file', type=str, help='Specify a file to install')
+        parser.add_argument('-h', '--help', action='store_true', help='Show this help message and exit')
+        args = parser.parse_args()
 
-    if args.help:
-        print_rich_help()
-        return
+        if args.help:
+            print_rich_help()
+            return
 
-    if args.dry_run:
-        console.print("[yellow]Dry run mode activated. No changes will be made.[/yellow]")
+        if args.dry_run:
+            console.print("[yellow]Dry run mode activated. No changes will be made.[/yellow]")
 
-    config = load_config()
+        config = load_config()
 
-    commands = [
-        InstallDotfilesCommand(config),
-        GenerateWrapperScriptsCommand(config),
-        UpdateZshrcAliasesCommand(config)
-    ]
+        commands = [
+            InstallDotfilesCommand(config),
+            GenerateWrapperScriptsCommand(config),
+            UpdateZshrcAliasesCommand(config)
+        ]
 
-    changes_made = False
-    zshrc_changed = False
+        changes_made = False
+        zshrc_changed = False
 
-    for i, command in enumerate(commands, 1):
-        console.print(f"\n[bold]{i}. {command.__class__.__name__}:[/bold]")
-        result = command.execute(dry_run=args.dry_run)
-        changes_made |= bool(result)
-        if isinstance(command, UpdateZshrcAliasesCommand):
-            zshrc_changed |= result
+        for i, command in enumerate(commands, 1):
+            console.print(f"\n[bold]{i}. {command.__class__.__name__}:[/bold]")
+            result = command.execute(dry_run=args.dry_run)
+            changes_made |= bool(result)
+            if isinstance(command, UpdateZshrcAliasesCommand):
+                zshrc_changed |= result
 
-    if args.dry_run:
-        console.print('\n[yellow]Dry run complete. No changes were made.[/yellow]')
-    elif changes_made:
-        console.print('\n[green]Installation complete.[/green]')
-        if zshrc_changed:
-            console.print("[yellow]Please restart your terminal or run 'source ~/.zshrc' to use the new commands.[/yellow]")
-    else:
-        console.print('\n[green]No changes were necessary. Everything is up to date.[/green]')
+        if args.dry_run:
+            console.print('\n[yellow]Dry run complete. No changes were made.[/yellow]')
+        elif changes_made:
+            console.print('\n[green]Installation complete.[/green]')
+            if zshrc_changed:
+                console.print("[yellow]Please restart your terminal or run 'source ~/.zshrc' to use the new commands.[/yellow]")
+        else:
+            console.print('\n[green]No changes were necessary. Everything is up to date.[/green]')
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operation cancelled by user. Exiting...[/yellow]")
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()

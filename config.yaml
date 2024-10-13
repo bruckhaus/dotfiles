@@ -15,7 +15,7 @@ aliases:
   - name: stash
     command: $HOME/.local/bin/stash_wrapper.sh $(pwd)
   - name: unzippy
-    command: $HOME/.local/bin/unzippy_wrapper.sh $(pwd)
+    command: $HOME/.local/bin/unzippy_wrapper.sh
 
 settings:
   install_dir: ~/.local/bin

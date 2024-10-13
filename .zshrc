@@ -148,6 +148,6 @@ if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc' ]; then . 
 export PATH="$HOME/.local/bin:$PATH"
 
 # START dotfiles utilities
-alias stash="$HOME/.local/bin/stash_wrapper.sh $(pwd)"
-alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh $(pwd)"
+alias stash="$HOME/.local/bin/stash_wrapper.sh"
+alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
 # END dotfiles utilities
