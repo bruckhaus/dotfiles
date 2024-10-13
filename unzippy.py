@@ -21,6 +21,7 @@ from rich.panel import Panel
 from rich import print as rprint
 from rich.tree import Tree
 from abc import ABC, abstractmethod
+from rich.text import Text
 
 console = Console()
 
@@ -45,7 +46,7 @@ def safe_delete_file(file_path):
         logging.error(f"Error deleting {file_path}: {str(e)}")
         return False
 
-def display_info(info, max_info_lines, test_mode=False):
+def create_summary_table(info):
     summary = Table(title="Extracted Content Summary", show_header=False, expand=False)
     summary.add_column("Attribute", style="cyan")
     summary.add_column("Value", style="magenta")
@@ -58,55 +59,66 @@ def display_info(info, max_info_lines, test_mode=False):
     compression_ratio = info['zip_size'] / info['total_size'] if info['total_size'] > 0 else 1
     summary.add_row("Compression Ratio", f"{compression_ratio:.2f}x ({humanize.naturalsize(info['total_size'])} -> {humanize.naturalsize(info['zip_size'])})")
     
-    console.print(summary)
-    
+    return summary
+
+def create_file_types_table(info, max_info_lines):
     file_type_info = [(type, count) for type, count in info['file_types'].items()]
     file_type_info.sort(key=lambda x: x[1], reverse=True)
     
     if len(file_type_info) + 5 <= max_info_lines:
-        file_types_table = Table(title="File Types", show_header=True, expand=False)
-        file_types_table.add_column("Type", style="cyan")
-        file_types_table.add_column("Count", style="magenta", justify="right")
-        for file_type, count in file_type_info:
-            file_types_table.add_row(file_type, str(count))
-        console.print(file_types_table)
+        title = "File Types"
+        data = file_type_info
     else:
-        file_types_table = Table(title=f"Top {max_info_lines - 5} File Types", show_header=True, expand=False)
-        file_types_table.add_column("Type", style="cyan")
-        file_types_table.add_column("Count", style="magenta", justify="right")
-        for file_type, count in file_type_info[:max_info_lines - 5]:
-            file_types_table.add_row(file_type, str(count))
-        console.print(file_types_table)
+        title = f"Top {max_info_lines - 5} File Types"
+        data = file_type_info[:max_info_lines - 5]
     
+    table = Table(title=title, show_header=True, expand=False)
+    table.add_column("Type", style="cyan")
+    table.add_column("Count", style="magenta", justify="right")
+    for file_type, count in data:
+        table.add_row(file_type, str(count))
+    
+    return table
+
+def create_checksum_panel(info):
     checksum_info = list(info['checksums'].items())
     matching_checksums = sum(1 for _, checksums in checksum_info if checksums['zip'] == checksums['extracted'])
     mismatched_checksums = len(checksum_info) - matching_checksums
     
-    checksum_panel = Panel(
+    return Panel(
         f"Total files checked: {len(checksum_info)}\n"
         f"Matching checksums: [green]{matching_checksums}[/green]\n"
         f"Mismatched checksums: [red]{mismatched_checksums}[/red]",
         title="Checksum Comparison",
         expand=False
     )
-    console.print(checksum_panel)
-    
-    if mismatched_checksums > 0:
-        mismatch_tree = Tree("Mismatched files:")
-        for file, checksums in checksum_info:
-            if checksums['zip'] != checksums['extracted']:
-                file_node = mismatch_tree.add(file)
-                file_node.add(f"Zip CRC-32:       {checksums['zip']:08X}")
-                file_node.add(f"Extracted CRC-32: {checksums['extracted']:08X}")
-        console.print(mismatch_tree)
-    
-    success_panel = Panel(
+
+def create_mismatch_tree(info):
+    mismatch_tree = Tree("Mismatched files:")
+    for file, checksums in info['checksums'].items():
+        if checksums['zip'] != checksums['extracted']:
+            file_node = mismatch_tree.add(file)
+            file_node.add(f"Zip CRC-32:       {checksums['zip']:08X}")
+            file_node.add(f"Extracted CRC-32: {checksums['extracted']:08X}")
+    return mismatch_tree
+
+def create_success_panel(info):
+    return Panel(
         "\n".join(f"{indicator.replace('_', ' ').capitalize()}: {'[green]✓[/green]' if status else '[red]✗[/red]'}" 
                   for indicator, status in info['success_indicators'].items()),
         title="Success Indicators",
         expand=False
     )
-    console.print(success_panel)
+
+def display_info(info, max_info_lines, test_mode=False):
+    console.print(create_summary_table(info))
+    console.print(create_file_types_table(info, max_info_lines))
+    console.print(create_checksum_panel(info))
+    
+    if any(checksums['zip'] != checksums['extracted'] for checksums in info['checksums'].values()):
+        console.print(create_mismatch_tree(info))
+    
+    console.print(create_success_panel(info))
     
     if test_mode:
         console.print(f"\n[yellow]Test mode:[/yellow] Extracted content is in {info['extraction_dir']}")
@@ -227,12 +239,40 @@ class TestUnzipCommand(UnzipCommand):
         console.print(f"\n[yellow]Test mode: Extracted content is in {self.extraction_dir}[/yellow]")
         console.print("You can inspect the contents and then delete this directory manually.")
 
+def get_zip_checksums(zip_path):
+    checksums = {}
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        for file in zip_ref.infolist():
+            if not file.is_dir():
+                checksums[file.filename] = {
+                    'zip': file.CRC,
+                    'extracted': None
+                }
+    return checksums
+
 def calculate_file_checksum(file_path):
-    hash_md5 = hashlib.md5()
-    with open(file_path, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
+    with open(file_path, 'rb') as f:
+        return zlib.crc32(f.read()) & 0xFFFFFFFF
+
+def analyze_file(file_path, relative_path, info):
+    file_size = os.path.getsize(file_path)
+    file_type = magic.from_file(file_path, mime=True)
+    
+    info['total_files'] += 1
+    info['file_types'][file_type] += 1
+    info['total_size'] += file_size
+    
+    if file_size > info['largest_file'][1]:
+        info['largest_file'] = (relative_path, file_size)
+    
+    extracted_checksum = calculate_file_checksum(file_path)
+    if relative_path in info['checksums']:
+        info['checksums'][relative_path]['extracted'] = extracted_checksum
+    else:
+        info['checksums'][relative_path] = {
+            'zip': None,
+            'extracted': extracted_checksum
+        }
 
 def analyze_extracted_content(target_dir, zip_path):
     info = {
@@ -245,43 +285,15 @@ def analyze_extracted_content(target_dir, zip_path):
             'files_extracted': False,
             'no_errors': True
         },
-        'checksums': {}
+        'checksums': get_zip_checksums(zip_path)
     }
-    
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        for file in zip_ref.infolist():
-            if not file.is_dir():
-                info['checksums'][file.filename] = {
-                    'zip': file.CRC,  # This is the CRC-32 checksum stored in the zip
-                    'extracted': None
-                }
     
     for root, dirs, files in os.walk(target_dir):
         info['total_folders'] += len(dirs)
         for file in files:
             file_path = os.path.join(root, file)
             relative_path = os.path.relpath(file_path, target_dir)
-            file_size = os.path.getsize(file_path)
-            file_type = magic.from_file(file_path, mime=True)
-            
-            info['total_files'] += 1
-            info['file_types'][file_type] += 1
-            info['total_size'] += file_size
-            
-            if file_size > info['largest_file'][1]:
-                info['largest_file'] = (file, file_size)
-            
-            # Calculate CRC-32 for extracted file
-            with open(file_path, 'rb') as f:
-                extracted_crc = zlib.crc32(f.read()) & 0xFFFFFFFF
-            
-            if relative_path in info['checksums']:
-                info['checksums'][relative_path]['extracted'] = extracted_crc
-            else:
-                info['checksums'][relative_path] = {
-                    'zip': None,
-                    'extracted': extracted_crc
-                }
+            analyze_file(file_path, relative_path, info)
     
     # Check success indicators
     info['success_indicators']['files_extracted'] = info['total_files'] > 0
@@ -294,25 +306,35 @@ def analyze_extracted_content(target_dir, zip_path):
     
     return info
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Unzip helper for macOS",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument('-m', '--max_lines', type=int, default=40,
+                        help='Maximum number of info lines to display')
+    parser.add_argument('-t', '--target', default=os.getcwd(),
+                        help='Target directory for extraction')
+    parser.add_argument('-f', '--file',
+                        help='Specific zip file to process')
+    parser.add_argument('--test', action='store_true',
+                        help='Run in test mode (no deletion, cleanup after extraction)')
+    return parser.parse_args()
+
 def main():
-    parser = argparse.ArgumentParser(description="Unzip helper for macOS")
-    parser.add_argument('-m', '--max_lines', type=int, default=40, help='Maximum number of info lines to display')
-    parser.add_argument('-t', '--target', default=os.getcwd(), help='Target directory for extraction')
-    parser.add_argument('-f', '--file', help='Specific zip file to process')
-    parser.add_argument('--test', action='store_true', help='Run in test mode (no deletion, cleanup after extraction)')
-    args = parser.parse_args()
+    args = parse_arguments()
 
     if args.file:
         if not os.path.exists(args.file) or not args.file.endswith('.zip'):
-            console.print(f"[red]Error: {args.file} is not a valid zip file.[/red]")
-            sys.exit(1)
+            print(f"Error: {args.file} is not a valid zip file.")
+            return
         zip_files = [args.file]
     else:
         zip_files = [f for f in os.listdir() if f.endswith('.zip')]
     
     if not zip_files:
-        console.print("[yellow]No zip files found to process.[/yellow]")
-        sys.exit(0)
+        print("No zip files found to process.")
+        return
     
     for zip_file in zip_files:
         if args.test:
@@ -321,12 +343,12 @@ def main():
             command = ProductionUnzipCommand(zip_file, args.target, args.max_lines)
         command.execute()
     
-    console.print("\n[green]All zip files processed.[/green]")
+    print("\nAll zip files processed.")
 
     if args.test:
         test_dir = Path.cwd() / "unzippy_test"
         if test_dir.exists():
-            console.print(f"\nTo delete all test extractions, run: [cyan]rm -rf {test_dir}[/cyan]")
+            print(f"\nTo delete all test extractions, run: rm -rf {test_dir}")
 
 if __name__ == "__main__":
     main()
