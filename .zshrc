@@ -97,7 +97,6 @@ export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 # other aliases:
 alias less='less -R'
 alias ccat='pygmentize -g'
-alias stash="$HOME/.local/bin/stash_wrapper.sh"
 
 # path:
 # Customize to your needs...
@@ -148,6 +147,7 @@ if [ -f '/Users/tilmannbruckhaus/google-cloud-sdk/completion.zsh.inc' ]; then . 
 
 export PATH="$HOME/.local/bin:$PATH"
 
-alias stash="/Users/tilmannbruckhaus/.local/bin/stash_wrapper.sh $(pwd)"
-
-alias stash="/Users/tilmannbruckhaus/.local/bin/stash_wrapper.sh"
+# START dotfiles utilities
+alias stash="$HOME/.local/bin/stash_wrapper.sh $(pwd)"
+alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh $(pwd)"
+# END dotfiles utilities
