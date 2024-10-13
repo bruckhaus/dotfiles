@@ -111,6 +111,22 @@ def display_info(info, max_info_lines, test_mode=False):
         console.print(f"\n[yellow]Test mode:[/yellow] Extracted content is in {info['extraction_dir']}")
         console.print("You can inspect the contents and then delete this directory manually.")
 
+def show_deletion_summary(zip_path, extraction_dir):
+    summary = Table(title="Deletion Summary", show_header=False, expand=False)
+    summary.add_column("Item", style="cyan")
+    summary.add_column("Details", style="magenta")
+    
+    summary.add_row("Original zip file to be deleted", str(zip_path))
+    summary.add_row("Extracted content location", str(extraction_dir))
+    
+    file_count = sum(len(files) for _, _, files in os.walk(extraction_dir))
+    dir_count = sum(len(dirs) for _, dirs, _ in os.walk(extraction_dir))
+    
+    summary.add_row("Files to be kept", str(file_count))
+    summary.add_row("Directories to be kept", str(dir_count))
+    
+    console.print(Panel(summary, title="Deletion Summary", expand=False))
+
 def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
     zip_name = Path(zip_path).stem  # Get the zip file name without extension
     
@@ -121,7 +137,7 @@ def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
         
         # Create a subdirectory for this specific zip file
         extraction_dir = test_dir / zip_name
-        print(f"Test mode: Extracting to {extraction_dir}")
+        console.print(f"Test mode: Extracting to {extraction_dir}")
     else:
         extraction_dir = Path(target_dir) / zip_name
     
@@ -148,6 +164,8 @@ def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
     display_info(extracted_info, max_info_lines, test_mode)
     
     if all(extracted_info['success_indicators'].values()):
+        show_deletion_summary(zip_path, extraction_dir)
+        
         if not test_mode:
             confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no): ").strip().lower()
             if confirmation == 'yes':

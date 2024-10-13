@@ -3,9 +3,13 @@ diff-match-patch==20230430
 distlib==0.3.8
 filelock==3.15.4
 humanize==4.11.0
+markdown-it-py==3.0.0
+mdurl==0.1.2
 pipenv==2024.0.1
 platformdirs==4.2.2
+Pygments==2.18.0
 python-magic==0.4.27
+rich==13.9.2
 tabulate==0.9.0
 termcolor==2.4.0
 tqdm==4.66.5
