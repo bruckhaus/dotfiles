@@ -106,17 +106,16 @@ def create_mismatch_tree(info):
     return mismatch_tree
 
 def create_success_panel(info):
-    content = Text()
-    content.append("Original zip file to be deleted: ", style="cyan")
-    content.append(f"{info['zip_path']}\n", style="magenta")
-    content.append("Extracted content location: ", style="cyan")
-    content.append(f"{info['extraction_dir']}\n", style="magenta")
-    content.append("Files to be kept: ", style="cyan")
-    content.append(f"{info['total_files']}\n", style="magenta")
-    content.append("Directories to be kept: ", style="cyan")
-    content.append(f"{info['total_folders']}", style="magenta")
-
-    return Panel(content, title="Deletion Summary", expand=False, border_style="bold")
+    table = Table(title="Deletion Summary", show_header=False, expand=False, box=box.ROUNDED)
+    table.add_column("Item", style="cyan")
+    table.add_column("Details", style="magenta")
+    
+    table.add_row("Original zip file to be deleted", str(info['zip_path']))
+    table.add_row("Extracted content location", str(info['extraction_dir']))
+    table.add_row("Files to be kept", str(info['total_files']))
+    table.add_row("Directories to be kept", str(info['total_folders']))
+    
+    return table
 
 def display_info(info, test_mode=False):
     console.print(create_summary_table(info))
@@ -201,13 +200,16 @@ class ProductionUnzipCommand(UnzipCommand):
         extracted_info = self.analyze_and_display()
         
         if all(extracted_info['success_indicators'].values()):
-            self.show_deletion_summary()
+            console.print(create_success_panel(extracted_info))
             try:
-                confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no): ").strip().lower()
+                confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no/exit): ").strip().lower()
                 if confirmation == 'yes':
                     safe_delete_file(self.zip_path)
+                elif confirmation == 'exit':
+                    console.print("[yellow]Operation aborted. Exiting program.[/yellow]")
+                    sys.exit(0)
                 else:
-                    console.print("[yellow]Deletion cancelled.[/yellow]")
+                    console.print("[yellow]Deletion cancelled for this file.[/yellow]")
             except KeyboardInterrupt:
                 console.print("\n[yellow]Operation cancelled by user.[/yellow]")
         else:
@@ -360,10 +362,13 @@ def main():
 
     # If no files are specified, process all zip files in the working directory
     if not zip_files:
-        zip_files = list(working_dir.glob('*.zip'))
-        if not zip_files:
-            print(f"No zip files found in {working_dir}. Use 'unzippy --help' for usage information.")
-            return
+        zip_files = sorted(working_dir.glob('*.zip'))
+    else:
+        zip_files = sorted(zip_files)
+
+    if not zip_files:
+        print(f"No zip files found in {working_dir}. Use 'unzippy --help' for usage information.")
+        return
 
     for i, zip_file in enumerate(zip_files):
         if i > 0:
@@ -385,11 +390,15 @@ def main():
         print(f"\nProcessing zip file: {zip_path}")
         print(f"Test mode: {'Yes' if args.test else 'No'}")
 
-        if args.test:
-            command = TestUnzipCommand(str(zip_path), str(args.target or working_dir))
-        else:
-            command = ProductionUnzipCommand(str(zip_path), str(args.target or working_dir))
-        command.execute()
+        try:
+            if args.test:
+                command = TestUnzipCommand(str(zip_path), str(args.target or working_dir))
+            else:
+                command = ProductionUnzipCommand(str(zip_path), str(args.target or working_dir))
+            command.execute()
+        except SystemExit:
+            console.print("[yellow]Exiting program as requested.[/yellow]")
+            break
 
     if args.test:
         test_dir = working_dir / "unzippy_test"
