@@ -12,6 +12,7 @@ import hashlib
 import magic
 import logging
 from tqdm import tqdm
+import tempfile
 
 def setup_logging(zip_path):
     log_file = f"{os.path.splitext(zip_path)[0]}.log"
@@ -19,16 +20,29 @@ def setup_logging(zip_path):
                         format='%(asctime)s - %(levelname)s - %(message)s')
 
 def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
+    if test_mode:
+        # Create a temporary directory for test mode
+        with tempfile.TemporaryDirectory() as temp_dir:
+            logging.info(f"Test mode: Using temporary directory {temp_dir}")
+            _process_zip(zip_path, temp_dir, max_info_lines, test_mode)
+    else:
+        _process_zip(zip_path, target_dir, max_info_lines, test_mode)
+
+def _process_zip(zip_path, target_dir, max_info_lines, test_mode=False):
     setup_logging(zip_path)
     logging.info(f"Starting to process: {zip_path}")
     print(f"\nProcessing: {zip_path}")
+    
+    # Create a subdirectory for extraction
+    extraction_dir = os.path.join(target_dir, os.path.splitext(os.path.basename(zip_path))[0])
+    os.makedirs(extraction_dir, exist_ok=True)
     
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             total_size = sum(file.file_size for file in zip_ref.infolist())
             with tqdm(total=total_size, unit='B', unit_scale=True, desc="Extracting") as pbar:
                 for file in zip_ref.infolist():
-                    zip_ref.extract(file, target_dir)
+                    zip_ref.extract(file, extraction_dir)
                     pbar.update(file.file_size)
     except zipfile.BadZipFile:
         logging.error(f"Error: {zip_path} is not a valid zip file.")
@@ -39,7 +53,7 @@ def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
         print(f"Error extracting {zip_path}: {str(e)}")
         return
     
-    extracted_info = analyze_extracted_content(target_dir, zip_path)
+    extracted_info = analyze_extracted_content(extraction_dir, zip_path)
     display_info(extracted_info, max_info_lines)
     
     if all(extracted_info['success_indicators']):
@@ -50,8 +64,8 @@ def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
     
     if test_mode:
         print("Test mode: Cleaning up extracted files...")
-        shutil.rmtree(target_dir)
-        logging.info(f"Test mode: Cleaned up extracted files in {target_dir}")
+        shutil.rmtree(extraction_dir)
+        logging.info(f"Test mode: Cleaned up extracted files in {extraction_dir}")
 
 def analyze_extracted_content(target_dir, zip_path):
     info = {
@@ -148,4 +162,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
