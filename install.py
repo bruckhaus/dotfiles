@@ -4,6 +4,7 @@ import os
 import argparse
 import shutil
 import yaml
+from abc import ABC, abstractmethod
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -11,33 +12,39 @@ from rich.table import Table
 from rich.theme import Theme
 
 # Constants
-DOTFILES = [
-    '.bash_profile',
-    '.bashrc',
-    '.emacs',
-    '.gitconfig',
-    '.zshrc',
-    '.config/wezterm',
-    '.config/starship.toml'
-]
 
-SCRIPTS = [
-    'stash.py',
-    'unzippy.py'
-]
+def create_custom_theme(config):
+    return Theme(config['theme'])
 
-custom_theme = Theme({
-    "info": "cyan",
-    "warning": "yellow",
-    "danger": "bold red",
-    "success": "bold green",
-    "file": "cyan",
-    "prompt": "blue",
-    "highlight": "magenta",
-    "dry_run": "dim white",
-})
+class Command(ABC):
+    @abstractmethod
+    def execute(self, dry_run=False):
+        pass
 
-console = Console(theme=custom_theme)
+class InstallDotfilesCommand(Command):
+    def __init__(self, config):
+        self.config = config
+        self.dotfiles = config['dotfiles']
+
+    def execute(self, dry_run=False):
+        return install_files(self.dotfiles, specific_file=None, dry_run=dry_run)
+
+class GenerateWrapperScriptsCommand(Command):
+    def __init__(self, config):
+        self.config = config
+        self.scripts = config['scripts']
+        self.install_dir = config['settings']['install_dir']
+
+    def execute(self, dry_run=False):
+        here = os.path.dirname(os.path.realpath(__file__))
+        return generate_wrapper_scripts(self.install_dir, here, self.scripts, dry_run)
+
+class UpdateZshrcAliasesCommand(Command):
+    def __init__(self, config):
+        self.config = config
+
+    def execute(self, dry_run=False):
+        return update_zshrc_aliases(dry_run)
 
 class WrapperScript:
     def __init__(self, script_name, install_dir, script_dir):
@@ -60,7 +67,7 @@ class WrapperScript:
             return "Up to date" if existing_content.strip() == self.wrapper_content.strip() else "Needs update"
         return "New"
 
-    def process(self, dry_run=False):
+    def process(self):
         console.print(f"\n[bold]Processing wrapper script:[/bold] {self.wrapper_name}")
         console.print(f"[bold]Target path:[/bold] {self.wrapper_path}")
 
@@ -74,14 +81,21 @@ class WrapperScript:
         else:
             console.print("[yellow]❗ Wrapper script does not exist.[/yellow]")
 
+        return WrapperScriptUpdateCommand(self)
+
+class WrapperScriptUpdateCommand(Command):
+    def __init__(self, wrapper_script):
+        self.wrapper_script = wrapper_script
+
+    def execute(self, dry_run=False):
         if dry_run:
-            console.print(f"[cyan]Dry run: Would {'update' if status == 'Needs update' else 'create'} {self.wrapper_path}[/cyan]")
+            console.print(f"[cyan]Dry run: Would {'update' if self.wrapper_script.get_status() == 'Needs update' else 'create'} {self.wrapper_script.wrapper_path}[/cyan]")
             return
 
-        if status == "Needs update":
+        if self.wrapper_script.get_status() == "Needs update":
             choice = console.input("Choose an option (1: Keep existing, 2: Replace with backup, 3: Replace without backup): ")
             if choice == '2':
-                os.rename(self.wrapper_path, self.wrapper_path + '.bak')
+                os.rename(self.wrapper_script.wrapper_path, self.wrapper_script.wrapper_path + '.bak')
                 console.print("[green]Backed up existing wrapper.[/green]")
             elif choice == '3':
                 console.print("[yellow]Replacing without backup.[/yellow]")
@@ -89,10 +103,34 @@ class WrapperScript:
                 console.print("[yellow]Keeping existing wrapper script.[/yellow]")
                 return
 
-        with open(self.wrapper_path, 'w') as f:
-            f.write(self.wrapper_content)
-        os.chmod(self.wrapper_path, 0o755)
+        with open(self.wrapper_script.wrapper_path, 'w') as f:
+            f.write(self.wrapper_script.wrapper_content)
+        os.chmod(self.wrapper_script.wrapper_path, 0o755)
         console.print("[green]Created/Updated wrapper script.[/green]")
+
+def generate_wrapper_scripts(install_dir, script_dir, scripts, dry_run=False):
+    wrappers = [WrapperScript(script, install_dir, script_dir) for script in scripts]
+    
+    wrapper_table = Table(title="Wrapper Scripts Status")
+    wrapper_table.add_column("Script", style="cyan", no_wrap=True)
+    wrapper_table.add_column("Status", style="green")
+
+    update_commands = []
+
+    for wrapper in wrappers:
+        status = wrapper.get_status()
+        wrapper_table.add_row(wrapper.script_name, f"[{'green' if status == 'Up to date' else 'yellow'}]{status}[/{'green' if status == 'Up to date' else 'yellow'}]")
+        if status != "Up to date":
+            update_commands.append(wrapper.process())
+
+    console.print(wrapper_table)
+
+    if update_commands:
+        console.print("\n[bold]Wrapper scripts requiring updates:[/bold]")
+        for command in update_commands:
+            command.execute(dry_run=dry_run)
+
+    return [wrapper.wrapper_path for wrapper in wrappers]
 
 def create_wrapper_table(wrappers):
     table = Table(title="Wrapper Scripts")
@@ -105,8 +143,8 @@ def create_wrapper_table(wrappers):
 
     return table
 
-def generate_wrapper_scripts(install_dir, script_dir, dry_run=False):
-    wrappers = [WrapperScript(script, install_dir, script_dir) for script in CONFIG['scripts']]
+def generate_wrapper_scripts(install_dir, script_dir, scripts, dry_run=False):
+    wrappers = [WrapperScript(script, install_dir, script_dir) for script in scripts]
     
     wrapper_table = Table(title="Wrapper Scripts Status")
     wrapper_table.add_column("Script", style="cyan", no_wrap=True)
@@ -174,7 +212,7 @@ def perform_update(file_path, update_function, *args):
     console.print("File updated successfully.", style="success")
     return True
 
-def install_files(specific_file=None, dry_run=False):
+def install_files(dotfiles, specific_file=None, dry_run=False):
     here = os.path.dirname(os.path.realpath(__file__))
     install_dir = CONFIG['settings']['install_dir']
 
@@ -187,7 +225,7 @@ def install_files(specific_file=None, dry_run=False):
     
     files_to_update = []
 
-    for i in CONFIG['dotfiles']:
+    for i in dotfiles:
         if specific_file and i != specific_file:
             continue
         source_path = os.path.join(here, i)
@@ -228,11 +266,11 @@ def print_rich_help():
     help_text.append("This script installs dotfiles and creates wrapper scripts for utility Python scripts.\n\n")
     
     help_text.append("Dotfiles to be installed:\n", style="bold")
-    for dotfile in DOTFILES:
+    for dotfile in CONFIG['dotfiles']:
         help_text.append(f"  • {dotfile}\n", style="cyan")
     
     help_text.append("\nScripts to create wrappers for:\n", style="bold")
-    for script in SCRIPTS:
+    for script in CONFIG['scripts']:
         help_text.append(f"  • {script}\n", style="cyan")
     
     help_text.append("\nUsage:\n", style="bold")
@@ -331,6 +369,8 @@ def load_config():
     return config
 
 CONFIG = load_config()
+custom_theme = create_custom_theme(CONFIG)
+console = Console(theme=custom_theme)
 
 def main():
     parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
@@ -346,24 +386,23 @@ def main():
     if args.dry_run:
         console.print("[yellow]Dry run mode activated. No changes will be made.[/yellow]")
 
-    here = os.path.dirname(os.path.realpath(__file__))
-    install_dir = CONFIG['settings']['install_dir']
+    config = load_config()
+
+    commands = [
+        InstallDotfilesCommand(config),
+        GenerateWrapperScriptsCommand(config),
+        UpdateZshrcAliasesCommand(config)
+    ]
 
     changes_made = False
     zshrc_changed = False
 
-    console.print("\n[bold]1. Dotfiles Symlinks:[/bold]")
-    dotfiles_changed = install_files(args.file, args.dry_run)
-    changes_made |= bool(dotfiles_changed)
-    zshrc_changed |= '.zshrc' in dotfiles_changed
-
-    console.print("\n[bold]2. Wrapper Scripts Generation:[/bold]")
-    changes_made |= bool(generate_wrapper_scripts(install_dir, here, args.dry_run))
-
-    console.print("\n[bold]3. Updating .zshrc Aliases:[/bold]")
-    aliases_changed = update_zshrc_aliases(args.dry_run)
-    changes_made |= aliases_changed
-    zshrc_changed |= aliases_changed
+    for i, command in enumerate(commands, 1):
+        console.print(f"\n[bold]{i}. {command.__class__.__name__}:[/bold]")
+        result = command.execute(dry_run=args.dry_run)
+        changes_made |= bool(result)
+        if isinstance(command, UpdateZshrcAliasesCommand):
+            zshrc_changed |= result
 
     if args.dry_run:
         console.print('\n[yellow]Dry run complete. No changes were made.[/yellow]')

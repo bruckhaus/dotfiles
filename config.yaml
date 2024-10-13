@@ -18,7 +18,17 @@ aliases:
     command: $HOME/.local/bin/unzippy_wrapper.sh $(pwd)
 
 settings:
+  install_dir: ~/.local/bin
   backup_extension: .bak
   zshrc_start_marker: "# START dotfiles utilities"
   zshrc_end_marker: "# END dotfiles utilities"
-  install_dir: ~/.local/bin
+
+theme:
+  info: cyan
+  warning: yellow
+  danger: bold red
+  success: bold green
+  file: cyan
+  prompt: blue
+  highlight: magenta
+  dry_run: dim white
