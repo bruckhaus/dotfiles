@@ -3,6 +3,7 @@
 import os
 import argparse
 import shutil
+import yaml
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
@@ -105,7 +106,7 @@ def create_wrapper_table(wrappers):
     return table
 
 def generate_wrapper_scripts(install_dir, script_dir, dry_run=False):
-    wrappers = [WrapperScript(script, install_dir, script_dir) for script in SCRIPTS]
+    wrappers = [WrapperScript(script, install_dir, script_dir) for script in CONFIG['scripts']]
     
     wrapper_table = Table(title="Wrapper Scripts Status")
     wrapper_table.add_column("Script", style="cyan", no_wrap=True)
@@ -140,12 +141,12 @@ def generate_aliases_table(content, aliases, changes_needed):
     table.add_column("Command", style="magenta")
     table.add_column("Status", style="green")
 
-    for alias, command in aliases:
+    for alias in aliases:
         if changes_needed:
-            status = "[yellow]Update[/yellow]" if f"alias {alias}=" in content else "[yellow]New[/yellow]"
+            status = "[yellow]Update[/yellow]" if f"alias {alias['name']}=" in content else "[yellow]New[/yellow]"
         else:
             status = "[green]Up to date[/green]"
-        table.add_row(alias, command, status)
+        table.add_row(alias['name'], alias['command'], status)
 
     return table
 
@@ -175,7 +176,7 @@ def perform_update(file_path, update_function, *args):
 
 def install_files(specific_file=None, dry_run=False):
     here = os.path.dirname(os.path.realpath(__file__))
-    install_dir = os.path.expanduser("~/.local/bin")
+    install_dir = CONFIG['settings']['install_dir']
 
     # Ensure the installation directory exists
     os.makedirs(install_dir, exist_ok=True)
@@ -186,7 +187,7 @@ def install_files(specific_file=None, dry_run=False):
     
     files_to_update = []
 
-    for i in DOTFILES:
+    for i in CONFIG['dotfiles']:
         if specific_file and i != specific_file:
             continue
         source_path = os.path.join(here, i)
@@ -244,6 +245,93 @@ def print_rich_help():
 
     console.print(Panel(help_text, title="Help", expand=False))
 
+def create_backup(file_path):
+    backup_path = file_path + CONFIG['settings']['backup_extension']
+    try:
+        shutil.copy2(file_path, backup_path)
+        console.print(f"[green]Backup created at {backup_path}[/green]")
+    except IOError as e:
+        console.print(f"[red]Error creating backup: {e}[/red]")
+        return False
+    return True
+
+def extract_existing_section(content, start_marker, end_marker):
+    start_index = content.find(start_marker)
+    end_index = content.find(end_marker, start_index)
+    if start_index != -1 and end_index != -1:
+        return content[start_index:end_index + len(end_marker)].strip()
+    return ""
+
+def generate_aliases_content(aliases):
+    return '\n'.join(f"alias {alias['name']}=\"{alias['command']}\"" for alias in aliases)
+
+def update_zshrc_aliases(dry_run=False):
+    here = os.path.dirname(os.path.realpath(__file__))
+    zshrc_path = os.path.join(here, '.zshrc')
+
+    start_marker = CONFIG['settings']['zshrc_start_marker']
+    end_marker = CONFIG['settings']['zshrc_end_marker']
+    aliases = CONFIG['aliases']
+
+    try:
+        with open(zshrc_path, 'r') as file:
+            content = file.read()
+
+        existing_section = extract_existing_section(content, start_marker, end_marker)
+        new_section = f"{start_marker}\n{generate_aliases_content(aliases)}\n{end_marker}"
+
+        # Normalize both sections to ignore differences in quote types
+        normalized_existing = existing_section.replace("'", '"').replace(" ", "")
+        normalized_new = new_section.replace("'", '"').replace(" ", "")
+
+        changes_needed = normalized_existing != normalized_new
+
+        console.print(generate_aliases_table(content, aliases, changes_needed))
+
+        if changes_needed:
+            if not dry_run:
+                # Ensure we're only replacing the existing section, not appending
+                if existing_section:
+                    updated_content = content.replace(existing_section, new_section)
+                else:
+                    # If no existing section, append to the end of the file
+                    updated_content = content + "\n" + new_section
+
+                with open(zshrc_path, 'w') as file:
+                    file.write(updated_content)
+                console.print("Updated .zshrc with new aliases.")
+            else:
+                console.print("Dry run: Would update .zshrc with the following changes:")
+                console.print(f"Existing section:\n{existing_section}")
+                console.print(f"New section:\n{new_section}")
+        else:
+            console.print("No changes needed for .zshrc aliases.")
+
+        return changes_needed
+
+    except Exception as e:
+        console.print(f"[bold red]Error updating .zshrc: {str(e)}[/bold red]")
+        return False
+
+def load_config():
+    config_path = os.path.join(os.path.dirname(__file__), 'config.yaml')
+    with open(config_path, 'r') as file:
+        config = yaml.safe_load(file)
+    
+    # Set default values for optional settings
+    config.setdefault('settings', {})
+    config['settings'].setdefault('backup_extension', '.bak')
+    config['settings'].setdefault('zshrc_start_marker', '# START dotfiles utilities')
+    config['settings'].setdefault('zshrc_end_marker', '# END dotfiles utilities')
+    config['settings'].setdefault('install_dir', '~/.local/bin')
+    
+    # Expand user directory in install_dir
+    config['settings']['install_dir'] = os.path.expanduser(config['settings']['install_dir'])
+    
+    return config
+
+CONFIG = load_config()
+
 def main():
     parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
     parser.add_argument('--dry-run', action='store_true', help='Display actions without making any changes')
@@ -259,7 +347,7 @@ def main():
         console.print("[yellow]Dry run mode activated. No changes will be made.[/yellow]")
 
     here = os.path.dirname(os.path.realpath(__file__))
-    install_dir = os.path.expanduser("~/.local/bin")
+    install_dir = CONFIG['settings']['install_dir']
 
     changes_made = False
     zshrc_changed = False
@@ -285,84 +373,6 @@ def main():
             console.print("[yellow]Please restart your terminal or run 'source ~/.zshrc' to use the new commands.[/yellow]")
     else:
         console.print('\n[green]No changes were necessary. Everything is up to date.[/green]')
-
-def update_zshrc_content(content, new_section, start_marker, end_marker):
-    start_index = content.find(start_marker)
-    end_index = content.find(end_marker, start_index)
-    
-    if start_index != -1 and end_index != -1:
-        # Replace existing section
-        return content[:start_index] + new_section + content[end_index + len(end_marker):]
-    else:
-        # Add new section at the end
-        return content.rstrip() + '\n\n' + new_section + '\n'
-
-def generate_aliases_section(aliases, start_marker, end_marker):
-    section = [
-        start_marker,
-        *[f'alias {alias}="{command}"' for alias, command in aliases],
-        end_marker
-    ]
-    return '\n'.join(section)
-
-def update_zshrc_aliases(dry_run=False):
-    here = os.path.dirname(os.path.realpath(__file__))
-    zshrc_path = os.path.join(here, '.zshrc')
-
-    start_marker = "# START dotfiles utilities"
-    end_marker = "# END dotfiles utilities"
-    aliases = [
-        ('stash', '$HOME/.local/bin/stash_wrapper.sh $(pwd)'),
-        ('unzippy', '$HOME/.local/bin/unzippy_wrapper.sh $(pwd)')
-    ]
-
-    try:
-        with open(zshrc_path, 'r') as file:
-            content = file.read()
-
-        existing_section = extract_existing_section(content, start_marker, end_marker)
-        new_section = generate_aliases_section(aliases, start_marker, end_marker)
-
-        changes_needed = existing_section != new_section
-
-        console.print(generate_aliases_table(content, aliases, changes_needed))
-
-        if changes_needed:
-            console.print("\n[bold]Aliases requiring updates:[/bold]")
-            console.print(f"[cyan]Existing section:[/cyan]\n{existing_section}")
-            console.print(f"[cyan]New section:[/cyan]\n{new_section}")
-            
-            if dry_run:
-                console.print("[dim]Dry run: Would update .zshrc with the above changes[/dim]")
-            else:
-                def update_func(file_path, content, new_section, start_marker, end_marker):
-                    new_content = update_zshrc_content(content, new_section, start_marker, end_marker)
-                    with open(file_path, 'w') as outfile:
-                        outfile.write(new_content)
-                
-                return perform_update(zshrc_path, update_func, content, new_section, start_marker, end_marker)
-        return changes_needed
-
-    except IOError as e:
-        console.print(f"[red]Error updating .zshrc: {e}[/red]")
-        return False
-
-def extract_existing_section(content, start_marker, end_marker):
-    start_index = content.find(start_marker)
-    end_index = content.find(end_marker, start_index)
-    if start_index != -1 and end_index != -1:
-        return content[start_index:end_index + len(end_marker)].strip()
-    return ""
-
-def create_backup(file_path):
-    backup_path = file_path + '.bak'
-    try:
-        shutil.copy2(file_path, backup_path)
-        console.print(f"Backup created at {backup_path}", style="success")
-    except IOError as e:
-        console.print(f"Error creating backup: {e}", style="danger")
-        return False
-    return True
 
 if __name__ == '__main__':
     main()

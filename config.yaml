@@ -16,3 +16,9 @@ aliases:
     command: $HOME/.local/bin/stash_wrapper.sh $(pwd)
   - name: unzippy
     command: $HOME/.local/bin/unzippy_wrapper.sh $(pwd)
+
+settings:
+  backup_extension: .bak
+  zshrc_start_marker: "# START dotfiles utilities"
+  zshrc_end_marker: "# END dotfiles utilities"
+  install_dir: ~/.local/bin
