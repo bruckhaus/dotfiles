@@ -13,29 +13,119 @@ import magic
 import logging
 from tqdm import tqdm
 import tempfile
+from pathlib import Path
+import zlib
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich import print as rprint
+from rich.tree import Tree
+
+console = Console()
 
 def setup_logging(zip_path):
     log_file = f"{os.path.splitext(zip_path)[0]}.log"
     logging.basicConfig(filename=log_file, level=logging.INFO,
                         format='%(asctime)s - %(levelname)s - %(message)s')
 
-def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
-    if test_mode:
-        # Create a temporary directory for test mode
-        with tempfile.TemporaryDirectory() as temp_dir:
-            logging.info(f"Test mode: Using temporary directory {temp_dir}")
-            _process_zip(zip_path, temp_dir, max_info_lines, test_mode)
-    else:
-        _process_zip(zip_path, target_dir, max_info_lines, test_mode)
+def safe_delete_file(file_path):
+    try:
+        file_path = Path(file_path).resolve()
+        if not file_path.is_file():
+            print(f"Warning: {file_path} is not a file. Skipping deletion.")
+            return False
+        
+        os.remove(file_path)
+        print(f"Deleted: {file_path}")
+        logging.info(f"Deleted file: {file_path}")
+        return True
+    except Exception as e:
+        print(f"Error deleting {file_path}: {str(e)}")
+        logging.error(f"Error deleting {file_path}: {str(e)}")
+        return False
 
-def _process_zip(zip_path, target_dir, max_info_lines, test_mode=False):
-    setup_logging(zip_path)
-    logging.info(f"Starting to process: {zip_path}")
-    print(f"\nProcessing: {zip_path}")
+def display_info(info, max_info_lines, test_mode=False):
+    summary = Table(title="Extracted Content Summary", show_header=False, expand=False)
+    summary.add_column("Attribute", style="cyan")
+    summary.add_column("Value", style="magenta")
     
-    # Create a subdirectory for extraction
-    extraction_dir = os.path.join(target_dir, os.path.splitext(os.path.basename(zip_path))[0])
-    os.makedirs(extraction_dir, exist_ok=True)
+    summary.add_row("Total Files", str(info['total_files']))
+    summary.add_row("Total Folders", str(info['total_folders']))
+    summary.add_row("Total Size", humanize.naturalsize(info['total_size']))
+    summary.add_row("Largest File", f"{info['largest_file'][0]} ({humanize.naturalsize(info['largest_file'][1])})")
+    
+    compression_ratio = info['zip_size'] / info['total_size'] if info['total_size'] > 0 else 1
+    summary.add_row("Compression Ratio", f"{compression_ratio:.2f}x ({humanize.naturalsize(info['total_size'])} -> {humanize.naturalsize(info['zip_size'])})")
+    
+    console.print(summary)
+    
+    file_type_info = [(type, count) for type, count in info['file_types'].items()]
+    file_type_info.sort(key=lambda x: x[1], reverse=True)
+    
+    if len(file_type_info) + 5 <= max_info_lines:
+        file_types_table = Table(title="File Types", show_header=True, expand=False)
+        file_types_table.add_column("Type", style="cyan")
+        file_types_table.add_column("Count", style="magenta", justify="right")
+        for file_type, count in file_type_info:
+            file_types_table.add_row(file_type, str(count))
+        console.print(file_types_table)
+    else:
+        file_types_table = Table(title=f"Top {max_info_lines - 5} File Types", show_header=True, expand=False)
+        file_types_table.add_column("Type", style="cyan")
+        file_types_table.add_column("Count", style="magenta", justify="right")
+        for file_type, count in file_type_info[:max_info_lines - 5]:
+            file_types_table.add_row(file_type, str(count))
+        console.print(file_types_table)
+    
+    checksum_info = list(info['checksums'].items())
+    matching_checksums = sum(1 for _, checksums in checksum_info if checksums['zip'] == checksums['extracted'])
+    mismatched_checksums = len(checksum_info) - matching_checksums
+    
+    checksum_panel = Panel(
+        f"Total files checked: {len(checksum_info)}\n"
+        f"Matching checksums: [green]{matching_checksums}[/green]\n"
+        f"Mismatched checksums: [red]{mismatched_checksums}[/red]",
+        title="Checksum Comparison",
+        expand=False
+    )
+    console.print(checksum_panel)
+    
+    if mismatched_checksums > 0:
+        mismatch_tree = Tree("Mismatched files:")
+        for file, checksums in checksum_info:
+            if checksums['zip'] != checksums['extracted']:
+                file_node = mismatch_tree.add(file)
+                file_node.add(f"Zip CRC-32:       {checksums['zip']:08X}")
+                file_node.add(f"Extracted CRC-32: {checksums['extracted']:08X}")
+        console.print(mismatch_tree)
+    
+    success_panel = Panel(
+        "\n".join(f"{indicator.replace('_', ' ').capitalize()}: {'[green]✓[/green]' if status else '[red]✗[/red]'}" 
+                  for indicator, status in info['success_indicators'].items()),
+        title="Success Indicators",
+        expand=False
+    )
+    console.print(success_panel)
+    
+    if test_mode:
+        console.print(f"\n[yellow]Test mode:[/yellow] Extracted content is in {info['extraction_dir']}")
+        console.print("You can inspect the contents and then delete this directory manually.")
+
+def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
+    zip_name = Path(zip_path).stem  # Get the zip file name without extension
+    
+    if test_mode:
+        # Create a 'unzippy_test' directory in the current working directory
+        test_dir = Path.cwd() / "unzippy_test"
+        test_dir.mkdir(exist_ok=True)
+        
+        # Create a subdirectory for this specific zip file
+        extraction_dir = test_dir / zip_name
+        print(f"Test mode: Extracting to {extraction_dir}")
+    else:
+        extraction_dir = Path(target_dir) / zip_name
+    
+    extraction_dir.mkdir(parents=True, exist_ok=True)
     
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -54,18 +144,109 @@ def _process_zip(zip_path, target_dir, max_info_lines, test_mode=False):
         return
     
     extracted_info = analyze_extracted_content(extraction_dir, zip_path)
-    display_info(extracted_info, max_info_lines)
+    extracted_info['extraction_dir'] = extraction_dir
+    display_info(extracted_info, max_info_lines, test_mode)
     
-    if all(extracted_info['success_indicators']):
-        if not test_mode and input("Zip file successfully extracted. Delete the original zip file? (y/n): ").lower() == 'y':
-            os.remove(zip_path)
-            print(f"Deleted: {zip_path}")
-            logging.info(f"Deleted original zip file: {zip_path}")
+    if all(extracted_info['success_indicators'].values()):
+        if not test_mode:
+            confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no): ").strip().lower()
+            if confirmation == 'yes':
+                safe_delete_file(zip_path)
+            else:
+                console.print("[yellow]Deletion cancelled.[/yellow]")
+        else:
+            console.print("\n[yellow]Test mode: Simulated deletion:[/yellow]")
+            console.print(f"  Would delete zip file: [cyan]{zip_path}[/cyan]")
+            console.print(f"  Extracted content would remain in: [cyan]{extraction_dir}[/cyan]")
+    else:
+        console.print("\n[red]Extraction was not fully successful. Deletion skipped.[/red]")
+        console.print("Reasons:")
+        if not extracted_info['success_indicators']['files_extracted']:
+            console.print("- No files were extracted")
+        if not extracted_info['success_indicators']['no_errors']:
+            console.print("- Errors occurred during extraction")
     
-    if test_mode:
-        print("Test mode: Cleaning up extracted files...")
-        shutil.rmtree(extraction_dir)
-        logging.info(f"Test mode: Cleaned up extracted files in {extraction_dir}")
+    return extraction_dir
+
+def _process_zip(zip_path, target_dir, max_info_lines, test_mode=False):
+    temp_dir = None
+    try:
+        if test_mode:
+            temp_dir = tempfile.mkdtemp()
+            print(f"Test mode: Using temporary directory {temp_dir}")
+            extraction_dir = os.path.join(temp_dir, os.path.splitext(os.path.basename(zip_path))[0])
+        else:
+            extraction_dir = os.path.join(target_dir, os.path.splitext(os.path.basename(zip_path))[0])
+        
+        os.makedirs(extraction_dir, exist_ok=True)
+        
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                total_size = sum(file.file_size for file in zip_ref.infolist())
+                with tqdm(total=total_size, unit='B', unit_scale=True, desc="Extracting") as pbar:
+                    for file in zip_ref.infolist():
+                        zip_ref.extract(file, extraction_dir)
+                        pbar.update(file.file_size)
+        except zipfile.BadZipFile:
+            logging.error(f"Error: {zip_path} is not a valid zip file.")
+            print(f"Error: {zip_path} is not a valid zip file.")
+            return
+        except Exception as e:
+            logging.error(f"Error extracting {zip_path}: {str(e)}")
+            print(f"Error extracting {zip_path}: {str(e)}")
+            return
+        
+        extracted_info = analyze_extracted_content(extraction_dir, zip_path)
+        display_info(extracted_info, max_info_lines)
+        
+        print(f"Debug: Success indicators: {extracted_info['success_indicators']}")
+        
+        logging.info(f"Extraction completed. Success indicators: {extracted_info['success_indicators']}")
+        
+        if all(extracted_info['success_indicators']):
+            show_deletion_summary(zip_path, extraction_dir)
+            logging.info("Deletion summary displayed")
+            
+            if not test_mode:
+                confirmation = input("\nDo you want to proceed with the deletion? (yes/no): ").strip().lower()
+                if confirmation == 'yes':
+                    safe_delete_file(zip_path)
+                    shutil.rmtree(extraction_dir)
+                    print(f"Deleted extracted content in: {extraction_dir}")
+                    logging.info(f"Deleted extracted content in: {extraction_dir}")
+                else:
+                    print("Deletion cancelled.")
+            else:
+                print("\nTest mode: Simulated deletion:")
+                print(f"  Would delete zip file: {zip_path}")
+                print(f"  Would delete extracted content in: {extraction_dir}")
+                logging.info("Test mode: Simulated deletion")
+        else:
+            print("\nExtraction was not fully successful. Deletion skipped.")
+            print("Reasons:")
+            if not extracted_info['success_indicators']['files_extracted']:
+                print("- No files were extracted")
+            if not extracted_info['success_indicators']['no_errors']:
+                print("- Errors occurred during extraction")
+            if not extracted_info['success_indicators']['size_match']:
+                print("- Extracted size doesn't match the original zip file size (within tolerance)")
+            logging.warning("Extraction was not fully successful. Deletion skipped.")
+        
+        if test_mode:
+            print("\nTest mode: Simulated cleanup completed.")
+            logging.info("Test mode: Simulated cleanup completed")
+    
+    finally:
+        if test_mode and temp_dir:
+            print(f"Cleaning up temporary directory: {temp_dir}")
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+def calculate_file_checksum(file_path):
+    hash_md5 = hashlib.md5()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
 
 def analyze_extracted_content(target_dir, zip_path):
     info = {
@@ -74,14 +255,26 @@ def analyze_extracted_content(target_dir, zip_path):
         'file_types': defaultdict(int),
         'total_size': 0,
         'largest_file': ('', 0),
-        'success_indicators': [True, True, True],  # [files_extracted, no_errors, size_match]
+        'success_indicators': {
+            'files_extracted': False,
+            'no_errors': True
+        },
         'checksums': {}
     }
     
+    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        for file in zip_ref.infolist():
+            if not file.is_dir():
+                info['checksums'][file.filename] = {
+                    'zip': file.CRC,  # This is the CRC-32 checksum stored in the zip
+                    'extracted': None
+                }
+    
     for root, dirs, files in os.walk(target_dir):
         info['total_folders'] += len(dirs)
-        for file in tqdm(files, desc="Analyzing files", unit="file"):
+        for file in files:
             file_path = os.path.join(root, file)
+            relative_path = os.path.relpath(file_path, target_dir)
             file_size = os.path.getsize(file_path)
             file_type = magic.from_file(file_path, mime=True)
             
@@ -92,48 +285,28 @@ def analyze_extracted_content(target_dir, zip_path):
             if file_size > info['largest_file'][1]:
                 info['largest_file'] = (file, file_size)
             
-            # Calculate checksum
-            with open(file_path, "rb") as f:
-                file_hash = hashlib.md5()
-                for chunk in iter(lambda: f.read(4096), b""):
-                    file_hash.update(chunk)
-            info['checksums'][file] = file_hash.hexdigest()
+            # Calculate CRC-32 for extracted file
+            with open(file_path, 'rb') as f:
+                extracted_crc = zlib.crc32(f.read()) & 0xFFFFFFFF
+            
+            if relative_path in info['checksums']:
+                info['checksums'][relative_path]['extracted'] = extracted_crc
+            else:
+                info['checksums'][relative_path] = {
+                    'zip': None,
+                    'extracted': extracted_crc
+                }
     
     # Check success indicators
-    info['success_indicators'][0] = info['total_files'] > 0
-    info['success_indicators'][1] = True  # Assume no errors unless we implement error checking
+    info['success_indicators']['files_extracted'] = info['total_files'] > 0
     
     zip_size = os.path.getsize(zip_path)
-    info['success_indicators'][2] = abs(zip_size - info['total_size']) / zip_size < 0.1  # Allow 10% difference
+    info['zip_size'] = zip_size
     
-    # Calculate compression ratio
-    info['compression_ratio'] = zip_size / info['total_size'] if info['total_size'] > 0 else 0
+    print(f"Debug: Zip size: {zip_size}, Extracted size: {info['total_size']}")
+    print(f"Debug: Compression ratio: {zip_size / info['total_size']:.2f}")
     
     return info
-
-def display_info(info, max_info_lines):
-    print("\nExtracted Content Summary:")
-    print(f"Total Files: {info['total_files']}")
-    print(f"Total Folders: {info['total_folders']}")
-    print(f"Total Size: {humanize.naturalsize(info['total_size'])}")
-    print(f"Largest File: {info['largest_file'][0]} ({humanize.naturalsize(info['largest_file'][1])})")
-    print(f"Compression Ratio: {info['compression_ratio']:.2f}x ({humanize.naturalsize(info['total_size'])} -> {humanize.naturalsize(info['total_size']/info['compression_ratio'])})")
-    
-    file_type_info = [(type, count) for type, count in info['file_types'].items()]
-    file_type_info.sort(key=lambda x: x[1], reverse=True)
-    
-    if len(file_type_info) + 5 <= max_info_lines:  # +5 for the summary lines above
-        print("\nFile Types:")
-        print(tabulate(file_type_info, headers=['Type', 'Count'], tablefmt='pretty'))
-    else:
-        print(f"\nTop {max_info_lines - 5} File Types:")
-        print(tabulate(file_type_info[:max_info_lines - 5], headers=['Type', 'Count'], tablefmt='pretty'))
-    
-    print("\nChecksums:")
-    for file, checksum in list(info['checksums'].items())[:5]:  # Show first 5 checksums
-        print(f"{file}: {checksum}")
-    if len(info['checksums']) > 5:
-        print(f"... and {len(info['checksums']) - 5} more")
 
 def main():
     parser = argparse.ArgumentParser(description="Unzip helper for macOS")
@@ -158,7 +331,12 @@ def main():
     for zip_file in zip_files:
         unzip_file(zip_file, args.target, args.max_lines, args.test)
     
-    print("\nAll zip files processed.")
+    console.print("\n[green]All zip files processed.[/green]")
+
+    if args.test:
+        test_dir = Path.cwd() / "unzippy_test"
+        if test_dir.exists():
+            console.print(f"\nTo delete all test extractions, run: [cyan]rm -rf {test_dir}[/cyan]")
 
 if __name__ == "__main__":
     main()
