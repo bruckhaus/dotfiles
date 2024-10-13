@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
+from rich.theme import Theme
 
 # Constants
 DOTFILES = [
@@ -24,158 +25,152 @@ SCRIPTS = [
     'unzippy.py'
 ]
 
-console = Console()
+custom_theme = Theme({
+    "info": "cyan",
+    "warning": "yellow",
+    "danger": "bold red",
+    "success": "bold green",
+    "file": "cyan",
+    "prompt": "blue",
+    "highlight": "magenta",
+    "dry_run": "dim white",
+})
 
-def generate_wrapper_content(script_dir, script):
-    return f"""#!/bin/bash
-{script_dir}/venv/bin/python {script_dir}/{script} "$@"
+console = Console(theme=custom_theme)
+
+class WrapperScript:
+    def __init__(self, script_name, install_dir, script_dir):
+        self.script_name = script_name
+        self.wrapper_name = script_name.replace('.py', '_wrapper.sh')
+        self.install_dir = install_dir
+        self.script_dir = script_dir
+        self.wrapper_path = os.path.join(install_dir, self.wrapper_name)
+        self.wrapper_content = self._generate_content()
+
+    def _generate_content(self):
+        return f"""#!/bin/bash
+{self.script_dir}/venv/bin/python {self.script_dir}/{self.script_name} "$@"
 """
 
-def get_wrapper_status(wrapper_path, wrapper_content):
-    if os.path.exists(wrapper_path):
-        with open(wrapper_path, 'r') as f:
-            existing_content = f.read()
-        return "Up to date" if existing_content.strip() == wrapper_content.strip() else "Needs update"
-    return "New"
+    def get_status(self):
+        if os.path.exists(self.wrapper_path):
+            with open(self.wrapper_path, 'r') as f:
+                existing_content = f.read()
+            return "Up to date" if existing_content.strip() == self.wrapper_content.strip() else "Needs update"
+        return "New"
 
-def create_wrapper_table(install_dir, script_dir, scripts):
-    wrapper_table = Table(title="Wrapper Scripts")
-    wrapper_table.add_column("Script", style="cyan", no_wrap=True)
-    wrapper_table.add_column("Wrapper Path", style="magenta")
-    wrapper_table.add_column("Status", style="green")
+    def process(self, dry_run=False):
+        console.print(f"\n[bold]Processing wrapper script:[/bold] {self.wrapper_name}")
+        console.print(f"[bold]Target path:[/bold] {self.wrapper_path}")
 
-    for script in scripts:
-        wrapper_name = script.replace('.py', '_wrapper.sh')
-        wrapper_path = os.path.join(install_dir, wrapper_name)
-        wrapper_content = generate_wrapper_content(script_dir, script)
-        status = get_wrapper_status(wrapper_path, wrapper_content)
-        wrapper_table.add_row(script, wrapper_path, status)
-
-    return wrapper_table
-
-def process_wrapper_script(install_dir, script_dir, script, dry_run):
-    wrapper_name = script.replace('.py', '_wrapper.sh')
-    wrapper_path = os.path.join(install_dir, wrapper_name)
-    wrapper_content = generate_wrapper_content(script_dir, script)
-
-    console.print(f"\n[bold]Processing wrapper script:[/bold] {wrapper_name}")
-    console.print(f"[bold]Target path:[/bold] {wrapper_path}")
-
-    if os.path.exists(wrapper_path):
-        with open(wrapper_path, 'r') as f:
-            existing_content = f.read()
-        if existing_content.strip() == wrapper_content.strip():
+        status = self.get_status()
+        if status == "Up to date":
             console.print("[green]✓ Wrapper script already up to date.[/green]")
             return
-        console.print("[yellow]❗ Wrapper script needs updating.[/yellow]")
 
-        if dry_run:
-            console.print(f"[cyan]Dry run: Would update {wrapper_path}[/cyan]")
-            return
-
-        choice = console.input("Choose an option (1: Keep existing, 2: Replace with backup, 3: Replace without backup): ")
-
-        if choice == '2':
-            os.rename(wrapper_path, wrapper_path + '.bak')
-            console.print("[green]Backed up existing wrapper.[/green]")
-        elif choice == '3':
-            console.print("[yellow]Replacing without backup.[/yellow]")
+        if status == "Needs update":
+            console.print("[yellow]❗ Wrapper script needs updating.[/yellow]")
         else:
-            console.print("[yellow]Keeping existing wrapper script.[/yellow]")
-            return
+            console.print("[yellow]❗ Wrapper script does not exist.[/yellow]")
 
-    else:
-        console.print("[yellow]❗ Wrapper script does not exist.[/yellow]")
         if dry_run:
-            console.print(f"[cyan]Dry run: Would create wrapper script {wrapper_path}[/cyan]")
+            console.print(f"[cyan]Dry run: Would {'update' if status == 'Needs update' else 'create'} {self.wrapper_path}[/cyan]")
             return
 
-    with open(wrapper_path, 'w') as f:
-        f.write(wrapper_content)
-    os.chmod(wrapper_path, 0o755)
-    console.print("[green]Created/Updated wrapper script.[/green]")
+        if status == "Needs update":
+            choice = console.input("Choose an option (1: Keep existing, 2: Replace with backup, 3: Replace without backup): ")
+            if choice == '2':
+                os.rename(self.wrapper_path, self.wrapper_path + '.bak')
+                console.print("[green]Backed up existing wrapper.[/green]")
+            elif choice == '3':
+                console.print("[yellow]Replacing without backup.[/yellow]")
+            else:
+                console.print("[yellow]Keeping existing wrapper script.[/yellow]")
+                return
+
+        with open(self.wrapper_path, 'w') as f:
+            f.write(self.wrapper_content)
+        os.chmod(self.wrapper_path, 0o755)
+        console.print("[green]Created/Updated wrapper script.[/green]")
+
+def create_wrapper_table(wrappers):
+    table = Table(title="Wrapper Scripts")
+    table.add_column("Script", style="cyan", no_wrap=True)
+    table.add_column("Wrapper Path", style="magenta")
+    table.add_column("Status", style="green")
+
+    for wrapper in wrappers:
+        table.add_row(wrapper.script_name, wrapper.wrapper_path, wrapper.get_status())
+
+    return table
 
 def generate_wrapper_scripts(install_dir, script_dir, dry_run=False):
-    console.print(create_wrapper_table(install_dir, script_dir, SCRIPTS))
-
-    for script in SCRIPTS:
-        process_wrapper_script(install_dir, script_dir, script, dry_run)
+    wrappers = [WrapperScript(script, install_dir, script_dir) for script in SCRIPTS]
     
-    return [os.path.join(install_dir, script.replace('.py', '_wrapper.sh')) for script in SCRIPTS]
+    wrapper_table = Table(title="Wrapper Scripts Status")
+    wrapper_table.add_column("Script", style="cyan", no_wrap=True)
+    wrapper_table.add_column("Status", style="green")
 
-def generate_aliases_table(content, aliases):
+    wrappers_to_update = []
+
+    for wrapper in wrappers:
+        status = wrapper.get_status()
+        wrapper_table.add_row(wrapper.script_name, f"[{'green' if status == 'Up to date' else 'yellow'}]{status}[/{'green' if status == 'Up to date' else 'yellow'}]")
+        if status != "Up to date":
+            wrappers_to_update.append(wrapper)
+
+    console.print(wrapper_table)
+
+    if wrappers_to_update:
+        console.print("\n[bold]Wrapper scripts requiring updates:[/bold]")
+        for wrapper in wrappers_to_update:
+            console.print(f"\n[cyan]{wrapper.script_name}[/cyan]")
+            console.print(f"Target path: {wrapper.wrapper_path}")
+            
+            if dry_run:
+                console.print(f"[dim]Dry run: Would {'update' if wrapper.get_status() == 'Needs update' else 'create'} {wrapper.wrapper_path}[/dim]")
+            else:
+                wrapper.process()
+
+    return [wrapper.wrapper_path for wrapper in wrappers]
+
+def generate_aliases_table(content, aliases, changes_needed):
     table = Table(title="Aliases to be added/updated in .zshrc")
     table.add_column("Alias", style="cyan", no_wrap=True)
     table.add_column("Command", style="magenta")
     table.add_column("Status", style="green")
 
     for alias, command in aliases:
-        status = "Update" if f"alias {alias}=" in content else "New"
+        if changes_needed:
+            status = "[yellow]Update[/yellow]" if f"alias {alias}=" in content else "[yellow]New[/yellow]"
+        else:
+            status = "[green]Up to date[/green]"
         table.add_row(alias, command, status)
 
     return table
 
-def update_zshrc_aliases(dry_run=False):
-    here = os.path.dirname(os.path.realpath(__file__))
-    zshrc_path = os.path.join(here, '.zshrc')
-    temp_path = zshrc_path + '.temp'
+def get_update_choice(file_path):
+    console.print("Options:", style="prompt")
+    console.print("1. Keep existing (no change)")
+    console.print("2. Update without backup")
+    console.print("3. Update with backup")
+    while True:
+        choice = console.input("Choose an option (1/2/3): ")
+        if choice in ['1', '2', '3']:
+            return choice
+        console.print("Invalid choice. Please enter 1, 2, or 3.", style="danger")
 
-    console.print(f"[bold]Updating aliases in {zshrc_path}[/bold]")
-
-    start_marker = "# START dotfiles utilities"
-    end_marker = "# END dotfiles utilities"
-    other_aliases_marker = "# other aliases"
-    aliases = [
-        ('stash', '$HOME/.local/bin/stash_wrapper.sh $(pwd)'),
-        ('unzippy', '$HOME/.local/bin/unzippy_wrapper.sh $(pwd)')
-    ]
-
-    try:
-        with open(zshrc_path, 'r') as file:
-            content = file.read()
-
-        changes_needed = start_marker not in content or any(f"alias {alias}=" not in content for alias, _ in aliases)
-
-        if changes_needed and not dry_run:
-            backup_choice = console.input("Changes will be made to .zshrc. Create a backup? (y/n): ").lower()
-            if backup_choice == 'y':
-                if not create_backup(zshrc_path):
-                    return
-
-        console.print("[yellow]Existing dotfiles utilities section found. It will be updated.[/yellow]" if start_marker in content and end_marker in content else "[yellow]No existing dotfiles utilities section found. A new one will be added.[/yellow]")
-
-        console.print(generate_aliases_table(content, aliases))
-
-        if not dry_run and changes_needed:
-            new_content = update_zshrc_content(content, aliases, start_marker, end_marker, other_aliases_marker)
-
-            with open(temp_path, 'w') as outfile:
-                outfile.write(new_content)
-
-            # Atomic rename
-            os.rename(temp_path, zshrc_path)
-            console.print("[green]Updated .zshrc with new aliases.[/green]")
-        elif dry_run:
-            console.print("[cyan]Dry run: .zshrc would be updated with the above changes.[/cyan]")
-        else:
-            console.print("[green].zshrc is already up to date.[/green]")
-
-    except IOError as e:
-        console.print(f"[red]Error updating .zshrc: {e}[/red]")
-        return
-
-    if not dry_run and changes_needed:
-        console.print("[green]Update complete.[/green]")
-        console.print("[cyan]Please run 'source ~/.zshrc' to apply the changes to your current session.[/cyan]")
-
-def create_backup(file_path):
-    backup_path = file_path + '.bak'
-    try:
-        shutil.copy2(file_path, backup_path)
-        console.print(f"[green]Backup created at {backup_path}[/green]")
-    except IOError as e:
-        console.print(f"[red]Error creating backup: {e}[/red]")
+def perform_update(file_path, update_function, *args):
+    choice = get_update_choice(file_path)
+    if choice == '1':
+        console.print("Keeping existing file. No changes made.", style="info")
         return False
+    elif choice == '3':
+        if not create_backup(file_path):
+            return False
+    
+    update_function(file_path, *args)
+    console.print("File updated successfully.", style="success")
     return True
 
 def install_files(specific_file=None, dry_run=False):
@@ -185,96 +180,46 @@ def install_files(specific_file=None, dry_run=False):
     # Ensure the installation directory exists
     os.makedirs(install_dir, exist_ok=True)
 
-    console.print("\n[bold]1. Dotfiles Installation:[/bold]")
-    
-    for i in DOTFILES:
-        if specific_file and i != specific_file:
-            continue
-        source_path = os.path.join(here, i)
-        target_path = os.path.join(os.path.expanduser('~'), i)
-
-        console.print(f"\n[bold]Processing file:[/bold] {i}")
-        console.print(f"[bold]Source path:[/bold] {source_path}")
-        console.print(f"[bold]Target path:[/bold] {target_path}")
-
-        if os.path.exists(target_path) or os.path.islink(target_path):
-            if os.path.islink(target_path) and os.readlink(target_path) == source_path:
-                console.print("[green]✓ Already set up correctly.[/green]")
-                continue
-            else:
-                console.print("[yellow]❗ Change needed.[/yellow]")
-                if os.path.islink(target_path):
-                    console.print(f"[yellow]Existing symlink points to:[/yellow] {os.readlink(target_path)}")
-                else:
-                    console.print("[yellow]Existing file is not a symlink.[/yellow]")
-
-            if dry_run:
-                console.print(f"[cyan]Dry run: Would replace {target_path} with symlink to {source_path}[/cyan]")
-                continue
-
-            console.print("[bold]Options:[/bold]")
-            console.print("1. Keep existing")
-            console.print("2. Replace with new symlink (with backup)")
-            console.print("3. Replace with new symlink (without backup)")
-            choice = console.input("Choose an option (1/2/3): ")
-
-            if choice == '2':
-                os.rename(target_path, target_path + '.bak')
-                os.symlink(source_path, target_path)
-                console.print(f"[green]Backed up {target_path} and created new symlink.[/green]")
-            elif choice == '3':
-                if os.path.islink(target_path):
-                    os.unlink(target_path)
-                else:
-                    os.remove(target_path)
-                os.symlink(source_path, target_path)
-                console.print(f"[green]Replaced {target_path} with a new symlink.[/green]")
-            else:
-                console.print("[yellow]Keeping existing file/symlink.[/yellow]")
-        else:
-            console.print("[yellow]❗ File does not exist.[/yellow]")
-            if dry_run:
-                console.print(f"[cyan]Dry run: Would create symlink {target_path} -> {source_path}[/cyan]")
-            else:
-                os.symlink(source_path, target_path)
-                console.print(f"[green]Created symlink for {target_path}.[/green]")
-
-    # Create a table for dotfiles
-    dotfiles_table = Table(title="Dotfiles to be installed/updated")
+    dotfiles_table = Table(title="Dotfiles Status")
     dotfiles_table.add_column("File", style="cyan", no_wrap=True)
-    dotfiles_table.add_column("Source", style="magenta")
-    dotfiles_table.add_column("Target", style="green")
-    dotfiles_table.add_column("Status", style="yellow")
+    dotfiles_table.add_column("Status", style="green")
+    
+    files_to_update = []
 
     for i in DOTFILES:
         if specific_file and i != specific_file:
             continue
         source_path = os.path.join(here, i)
         target_path = os.path.join(os.path.expanduser('~'), i)
-        
+
         if os.path.exists(target_path) or os.path.islink(target_path):
             if os.path.islink(target_path) and os.readlink(target_path) == source_path:
-                status = "Up to date"
+                status = "[green]Up to date[/green]"
             else:
-                status = "Needs update"
+                status = "[yellow]Needs update[/yellow]"
+                files_to_update.append((i, source_path, target_path))
         else:
-            status = "New"
-        
-        dotfiles_table.add_row(i, source_path, target_path, status)
+            status = "[yellow]New[/yellow]"
+            files_to_update.append((i, source_path, target_path))
+
+        dotfiles_table.add_row(i, status)
 
     console.print(dotfiles_table)
 
-    console.print("\n[bold]2. Wrapper Scripts Generation:[/bold]")
-    generate_wrapper_scripts(install_dir, here, dry_run)
+    files_changed = []
 
-    console.print("\n[bold]3. Updating .zshrc Aliases:[/bold]")
-    update_zshrc_aliases(dry_run)
+    for file, source, target in files_to_update:
+        console.print(f"\n[cyan]{file}[/cyan]")
+        console.print(f"Source: {source}")
+        console.print(f"Target: {target}")
+        
+        if dry_run:
+            console.print(f"[dim]Dry run: Would update {target}[/dim]")
+        else:
+            if perform_update(target, os.symlink, source, target):
+                files_changed.append(file)
 
-    if dry_run:
-        console.print('\n[yellow]Dry run complete. No changes were made.[/yellow]')
-    else:
-        console.print('\n[green]Installation complete.[/green]')
-        console.print("[cyan]Please restart your terminal or run 'source ~/.zshrc' to use the new commands.[/cyan]")
+    return files_changed
 
 def print_rich_help():
     help_text = Text()
@@ -313,41 +258,111 @@ def main():
     if args.dry_run:
         console.print("[yellow]Dry run mode activated. No changes will be made.[/yellow]")
 
-    install_files(args.file, args.dry_run)
+    here = os.path.dirname(os.path.realpath(__file__))
+    install_dir = os.path.expanduser("~/.local/bin")
 
-def update_zshrc_content(content, aliases, start_marker, end_marker, other_aliases_marker):
-    new_content = []
-    in_section = False
-    section_added = False
-    for line in content.splitlines():
-        if line.strip() == start_marker:
-            if not section_added:
-                new_content.extend(generate_aliases_section(aliases, start_marker, end_marker))
-                section_added = True
-            in_section = True
-        elif line.strip() == end_marker:
-            in_section = False
-        elif line.strip() == other_aliases_marker and not section_added:
-            new_content.extend(generate_aliases_section(aliases, start_marker, end_marker))
-            section_added = True
-            new_content.append(line)
-        elif not in_section:
-            new_content.append(line)
+    changes_made = False
+    zshrc_changed = False
 
-    if not section_added:
-        new_content.extend(generate_aliases_section(aliases, start_marker, end_marker))
+    console.print("\n[bold]1. Dotfiles Symlinks:[/bold]")
+    dotfiles_changed = install_files(args.file, args.dry_run)
+    changes_made |= bool(dotfiles_changed)
+    zshrc_changed |= '.zshrc' in dotfiles_changed
 
-    return '\n'.join(new_content)
+    console.print("\n[bold]2. Wrapper Scripts Generation:[/bold]")
+    changes_made |= bool(generate_wrapper_scripts(install_dir, here, args.dry_run))
+
+    console.print("\n[bold]3. Updating .zshrc Aliases:[/bold]")
+    aliases_changed = update_zshrc_aliases(args.dry_run)
+    changes_made |= aliases_changed
+    zshrc_changed |= aliases_changed
+
+    if args.dry_run:
+        console.print('\n[yellow]Dry run complete. No changes were made.[/yellow]')
+    elif changes_made:
+        console.print('\n[green]Installation complete.[/green]')
+        if zshrc_changed:
+            console.print("[yellow]Please restart your terminal or run 'source ~/.zshrc' to use the new commands.[/yellow]")
+    else:
+        console.print('\n[green]No changes were necessary. Everything is up to date.[/green]')
+
+def update_zshrc_content(content, new_section, start_marker, end_marker):
+    start_index = content.find(start_marker)
+    end_index = content.find(end_marker, start_index)
+    
+    if start_index != -1 and end_index != -1:
+        # Replace existing section
+        return content[:start_index] + new_section + content[end_index + len(end_marker):]
+    else:
+        # Add new section at the end
+        return content.rstrip() + '\n\n' + new_section + '\n'
 
 def generate_aliases_section(aliases, start_marker, end_marker):
     section = [
-        '',
         start_marker,
         *[f'alias {alias}="{command}"' for alias, command in aliases],
-        end_marker,
-        ''
+        end_marker
     ]
-    return section
+    return '\n'.join(section)
+
+def update_zshrc_aliases(dry_run=False):
+    here = os.path.dirname(os.path.realpath(__file__))
+    zshrc_path = os.path.join(here, '.zshrc')
+
+    start_marker = "# START dotfiles utilities"
+    end_marker = "# END dotfiles utilities"
+    aliases = [
+        ('stash', '$HOME/.local/bin/stash_wrapper.sh $(pwd)'),
+        ('unzippy', '$HOME/.local/bin/unzippy_wrapper.sh $(pwd)')
+    ]
+
+    try:
+        with open(zshrc_path, 'r') as file:
+            content = file.read()
+
+        existing_section = extract_existing_section(content, start_marker, end_marker)
+        new_section = generate_aliases_section(aliases, start_marker, end_marker)
+
+        changes_needed = existing_section != new_section
+
+        console.print(generate_aliases_table(content, aliases, changes_needed))
+
+        if changes_needed:
+            console.print("\n[bold]Aliases requiring updates:[/bold]")
+            console.print(f"[cyan]Existing section:[/cyan]\n{existing_section}")
+            console.print(f"[cyan]New section:[/cyan]\n{new_section}")
+            
+            if dry_run:
+                console.print("[dim]Dry run: Would update .zshrc with the above changes[/dim]")
+            else:
+                def update_func(file_path, content, new_section, start_marker, end_marker):
+                    new_content = update_zshrc_content(content, new_section, start_marker, end_marker)
+                    with open(file_path, 'w') as outfile:
+                        outfile.write(new_content)
+                
+                return perform_update(zshrc_path, update_func, content, new_section, start_marker, end_marker)
+        return changes_needed
+
+    except IOError as e:
+        console.print(f"[red]Error updating .zshrc: {e}[/red]")
+        return False
+
+def extract_existing_section(content, start_marker, end_marker):
+    start_index = content.find(start_marker)
+    end_index = content.find(end_marker, start_index)
+    if start_index != -1 and end_index != -1:
+        return content[start_index:end_index + len(end_marker)].strip()
+    return ""
+
+def create_backup(file_path):
+    backup_path = file_path + '.bak'
+    try:
+        shutil.copy2(file_path, backup_path)
+        console.print(f"Backup created at {backup_path}", style="success")
+    except IOError as e:
+        console.print(f"Error creating backup: {e}", style="danger")
+        return False
+    return True
 
 if __name__ == '__main__':
     main()

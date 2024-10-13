@@ -1,0 +1,18 @@
+dotfiles:
+  - .bash_profile
+  - .bashrc
+  - .emacs
+  - .gitconfig
+  - .zshrc
+  - .config/wezterm
+  - .config/starship.toml
+
+scripts:
+  - stash.py
+  - unzippy.py
+
+aliases:
+  - name: stash
+    command: $HOME/.local/bin/stash_wrapper.sh $(pwd)
+  - name: unzippy
+    command: $HOME/.local/bin/unzippy_wrapper.sh $(pwd)
