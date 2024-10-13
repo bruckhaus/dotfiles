@@ -20,6 +20,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich import print as rprint
 from rich.tree import Tree
+from abc import ABC, abstractmethod
 
 console = Console()
 
@@ -127,137 +128,104 @@ def show_deletion_summary(zip_path, extraction_dir):
     
     console.print(Panel(summary, title="Deletion Summary", expand=False))
 
-def unzip_file(zip_path, target_dir, max_info_lines, test_mode=False):
-    zip_name = Path(zip_path).stem  # Get the zip file name without extension
-    
-    if test_mode:
-        # Create a 'unzippy_test' directory in the current working directory
-        test_dir = Path.cwd() / "unzippy_test"
-        test_dir.mkdir(exist_ok=True)
-        
-        # Create a subdirectory for this specific zip file
-        extraction_dir = test_dir / zip_name
-        console.print(f"Test mode: Extracting to {extraction_dir}")
-    else:
-        extraction_dir = Path(target_dir) / zip_name
-    
-    extraction_dir.mkdir(parents=True, exist_ok=True)
-    
-    try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            total_size = sum(file.file_size for file in zip_ref.infolist())
-            with tqdm(total=total_size, unit='B', unit_scale=True, desc="Extracting") as pbar:
-                for file in zip_ref.infolist():
-                    zip_ref.extract(file, extraction_dir)
-                    pbar.update(file.file_size)
-    except zipfile.BadZipFile:
-        logging.error(f"Error: {zip_path} is not a valid zip file.")
-        print(f"Error: {zip_path} is not a valid zip file.")
-        return
-    except Exception as e:
-        logging.error(f"Error extracting {zip_path}: {str(e)}")
-        print(f"Error extracting {zip_path}: {str(e)}")
-        return
-    
-    extracted_info = analyze_extracted_content(extraction_dir, zip_path)
-    extracted_info['extraction_dir'] = extraction_dir
-    display_info(extracted_info, max_info_lines, test_mode)
-    
-    if all(extracted_info['success_indicators'].values()):
-        show_deletion_summary(zip_path, extraction_dir)
-        
-        if not test_mode:
-            confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no): ").strip().lower()
-            if confirmation == 'yes':
-                safe_delete_file(zip_path)
-            else:
-                console.print("[yellow]Deletion cancelled.[/yellow]")
-        else:
-            console.print("\n[yellow]Test mode: Simulated deletion:[/yellow]")
-            console.print(f"  Would delete zip file: [cyan]{zip_path}[/cyan]")
-            console.print(f"  Extracted content would remain in: [cyan]{extraction_dir}[/cyan]")
-    else:
-        console.print("\n[red]Extraction was not fully successful. Deletion skipped.[/red]")
-        console.print("Reasons:")
-        if not extracted_info['success_indicators']['files_extracted']:
-            console.print("- No files were extracted")
-        if not extracted_info['success_indicators']['no_errors']:
-            console.print("- Errors occurred during extraction")
-    
-    return extraction_dir
+class UnzipCommand(ABC):
+    def __init__(self, zip_path, target_dir, max_info_lines):
+        self.zip_path = Path(zip_path)
+        self.target_dir = Path(target_dir)
+        self.max_info_lines = max_info_lines
+        self.extraction_dir = None
 
-def _process_zip(zip_path, target_dir, max_info_lines, test_mode=False):
-    temp_dir = None
-    try:
-        if test_mode:
-            temp_dir = tempfile.mkdtemp()
-            print(f"Test mode: Using temporary directory {temp_dir}")
-            extraction_dir = os.path.join(temp_dir, os.path.splitext(os.path.basename(zip_path))[0])
-        else:
-            extraction_dir = os.path.join(target_dir, os.path.splitext(os.path.basename(zip_path))[0])
-        
-        os.makedirs(extraction_dir, exist_ok=True)
+    @abstractmethod
+    def execute(self):
+        pass
+
+    def unzip(self):
+        self.extraction_dir = self.target_dir / self.zip_path.stem
+        self.extraction_dir.mkdir(parents=True, exist_ok=True)
         
         try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            with zipfile.ZipFile(self.zip_path, 'r') as zip_ref:
                 total_size = sum(file.file_size for file in zip_ref.infolist())
                 with tqdm(total=total_size, unit='B', unit_scale=True, desc="Extracting") as pbar:
                     for file in zip_ref.infolist():
-                        zip_ref.extract(file, extraction_dir)
+                        zip_ref.extract(file, self.extraction_dir)
                         pbar.update(file.file_size)
         except zipfile.BadZipFile:
-            logging.error(f"Error: {zip_path} is not a valid zip file.")
-            print(f"Error: {zip_path} is not a valid zip file.")
-            return
+            console.print(f"[red]Error: {self.zip_path} is not a valid zip file.[/red]")
+            return False
         except Exception as e:
-            logging.error(f"Error extracting {zip_path}: {str(e)}")
-            print(f"Error extracting {zip_path}: {str(e)}")
+            console.print(f"[red]Error extracting {self.zip_path}: {str(e)}[/red]")
+            return False
+        
+        return True
+
+    def analyze_and_display(self):
+        extracted_info = analyze_extracted_content(self.extraction_dir, self.zip_path)
+        display_info(extracted_info, self.max_info_lines)
+        return extracted_info
+
+    def show_deletion_summary(self):
+        summary = Table(title="Deletion Summary", show_header=False, expand=False)
+        summary.add_column("Item", style="cyan")
+        summary.add_column("Details", style="magenta")
+        
+        summary.add_row("Original zip file to be deleted", str(self.zip_path))
+        summary.add_row("Extracted content location", str(self.extraction_dir))
+        
+        file_count = sum(len(files) for _, _, files in os.walk(self.extraction_dir))
+        dir_count = sum(len(dirs) for _, dirs, _ in os.walk(self.extraction_dir))
+        
+        summary.add_row("Files to be kept", str(file_count))
+        summary.add_row("Directories to be kept", str(dir_count))
+        
+        console.print(Panel(summary, title="Deletion Summary", expand=False))
+
+class ProductionUnzipCommand(UnzipCommand):
+    def execute(self):
+        if not self.unzip():
             return
+
+        extracted_info = self.analyze_and_display()
         
-        extracted_info = analyze_extracted_content(extraction_dir, zip_path)
-        display_info(extracted_info, max_info_lines)
-        
-        print(f"Debug: Success indicators: {extracted_info['success_indicators']}")
-        
-        logging.info(f"Extraction completed. Success indicators: {extracted_info['success_indicators']}")
-        
-        if all(extracted_info['success_indicators']):
-            show_deletion_summary(zip_path, extraction_dir)
-            logging.info("Deletion summary displayed")
-            
-            if not test_mode:
-                confirmation = input("\nDo you want to proceed with the deletion? (yes/no): ").strip().lower()
-                if confirmation == 'yes':
-                    safe_delete_file(zip_path)
-                    shutil.rmtree(extraction_dir)
-                    print(f"Deleted extracted content in: {extraction_dir}")
-                    logging.info(f"Deleted extracted content in: {extraction_dir}")
-                else:
-                    print("Deletion cancelled.")
+        if all(extracted_info['success_indicators'].values()):
+            self.show_deletion_summary()
+            confirmation = console.input("\nDo you want to proceed with deleting the original zip file? (yes/no): ").strip().lower()
+            if confirmation == 'yes':
+                safe_delete_file(self.zip_path)
             else:
-                print("\nTest mode: Simulated deletion:")
-                print(f"  Would delete zip file: {zip_path}")
-                print(f"  Would delete extracted content in: {extraction_dir}")
-                logging.info("Test mode: Simulated deletion")
+                console.print("[yellow]Deletion cancelled.[/yellow]")
         else:
-            print("\nExtraction was not fully successful. Deletion skipped.")
-            print("Reasons:")
+            console.print("\n[red]Extraction was not fully successful. Deletion skipped.[/red]")
+            console.print("Reasons:")
             if not extracted_info['success_indicators']['files_extracted']:
-                print("- No files were extracted")
+                console.print("- No files were extracted")
             if not extracted_info['success_indicators']['no_errors']:
-                print("- Errors occurred during extraction")
-            if not extracted_info['success_indicators']['size_match']:
-                print("- Extracted size doesn't match the original zip file size (within tolerance)")
-            logging.warning("Extraction was not fully successful. Deletion skipped.")
+                console.print("- Errors occurred during extraction")
+
+class TestUnzipCommand(UnzipCommand):
+    def execute(self):
+        console.print(f"[yellow]Test mode: Extracting to {self.extraction_dir}[/yellow]")
         
-        if test_mode:
-            print("\nTest mode: Simulated cleanup completed.")
-            logging.info("Test mode: Simulated cleanup completed")
-    
-    finally:
-        if test_mode and temp_dir:
-            print(f"Cleaning up temporary directory: {temp_dir}")
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        if not self.unzip():
+            return
+
+        extracted_info = self.analyze_and_display()
+        
+        if all(extracted_info['success_indicators'].values()):
+            self.show_deletion_summary()
+            console.print("\n[yellow]Test mode: Simulated deletion:[/yellow]")
+            console.print(f"  Would delete zip file: [cyan]{self.zip_path}[/cyan]")
+            console.print(f"  Extracted content would remain in: [cyan]{self.extraction_dir}[/cyan]")
+        else:
+            console.print("\n[red]Extraction was not fully successful. Deletion would be skipped.[/red]")
+            console.print("Reasons:")
+            if not extracted_info['success_indicators']['files_extracted']:
+                console.print("- No files were extracted")
+            if not extracted_info['success_indicators']['no_errors']:
+                console.print("- Errors occurred during extraction")
+        
+        console.print(f"\n[yellow]Test mode: Extracted content is in {self.extraction_dir}[/yellow]")
+        console.print("You can inspect the contents and then delete this directory manually.")
 
 def calculate_file_checksum(file_path):
     hash_md5 = hashlib.md5()
@@ -336,18 +304,22 @@ def main():
 
     if args.file:
         if not os.path.exists(args.file) or not args.file.endswith('.zip'):
-            print(f"Error: {args.file} is not a valid zip file.")
+            console.print(f"[red]Error: {args.file} is not a valid zip file.[/red]")
             sys.exit(1)
         zip_files = [args.file]
     else:
         zip_files = [f for f in os.listdir() if f.endswith('.zip')]
     
     if not zip_files:
-        print("No zip files found to process.")
+        console.print("[yellow]No zip files found to process.[/yellow]")
         sys.exit(0)
     
     for zip_file in zip_files:
-        unzip_file(zip_file, args.target, args.max_lines, args.test)
+        if args.test:
+            command = TestUnzipCommand(zip_file, args.target, args.max_lines)
+        else:
+            command = ProductionUnzipCommand(zip_file, args.target, args.max_lines)
+        command.execute()
     
     console.print("\n[green]All zip files processed.[/green]")
 
