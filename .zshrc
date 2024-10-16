@@ -86,6 +86,7 @@ alias ll='ls -lah'
 alias llt='ls -laht'
 alias la='ls -lAh'
 alias l='ls -lah'
+alias lls='ls -lSh'
 # alias ls='ls -G'
 
 # python:
