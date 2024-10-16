@@ -45,13 +45,13 @@ plugins=(git)
 # Starship
 eval "$(starship init zsh)"
 # Activate syntax highlighting
-source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+# source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 # Disable underline
 (( ${+ZSH_HIGHLIGHT_STYLES} )) || typeset -A ZSH_HIGHLIGHT_STYLES
 ZSH_HIGHLIGHT_STYLES[path]=none
 ZSH_HIGHLIGHT_STYLES[path_prefix]=none
 # Activate autosuggestions
-source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+# source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
 # Allow changing directories without typing 'cd'
 setopt AUTO_CD
 # Enable case-insensitive completion
@@ -81,11 +81,12 @@ alias ga="git add"
 alias gc="git commit"
 
 # Common ls aliases
+alias ls="ls --color=auto"
 alias ll='ls -lah'
 alias llt='ls -laht'
 alias la='ls -lAh'
 alias l='ls -lah'
-alias ls='ls -G'
+# alias ls='ls -G'
 
 # python:
 alias python=python3
