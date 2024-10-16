@@ -15,7 +15,10 @@ import sys
 # Constants
 
 def create_custom_theme(config):
-    return Theme(config['theme'])
+    # Add 'error' style to the theme configuration
+    theme_config = config['theme']
+    theme_config.setdefault('error', 'bold red')  # Default to bold red for errors
+    return Theme(theme_config)
 
 class Command(ABC):
     @abstractmethod
@@ -243,10 +246,25 @@ def perform_update(file_path, update_function, *args):
     elif choice == '3':
         if not create_backup(file_path):
             return False
-    
-    update_function(file_path, *args)
-    console.print("File updated successfully.", style="success")
-    return True
+
+    # Check if the file or symlink exists and remove it if necessary
+    if os.path.lexists(file_path):  # Use lexists to check for both files and symlinks
+        try:
+            if os.path.isdir(file_path):
+                shutil.rmtree(file_path)  # Remove directory
+            else:
+                os.remove(file_path)  # Remove file or symlink
+        except OSError as e:
+            console.print(f"Error removing existing file: {e}", style="error")
+            return False
+
+    try:
+        update_function(*args)  # Call the update function with the provided arguments
+        console.print("File updated successfully.", style="success")
+        return True
+    except OSError as e:
+        console.print(f"Error updating file: {e}", style="error")
+        return False
 
 def install_files(dotfiles, specific_file=None, dry_run=False):
     here = os.path.dirname(os.path.realpath(__file__))
@@ -266,6 +284,10 @@ def install_files(dotfiles, specific_file=None, dry_run=False):
             continue
         source_path = os.path.join(here, i)
         target_path = os.path.join(os.path.expanduser('~'), i)
+
+        # Ensure .config directory exists if the target is within it
+        if i.startswith('.config/'):
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
 
         if os.path.exists(target_path) or os.path.islink(target_path):
             if os.path.islink(target_path) and os.readlink(target_path) == source_path:

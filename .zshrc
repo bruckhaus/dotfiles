@@ -151,3 +151,5 @@ export PATH="$HOME/.local/bin:$PATH"
 alias stash="$HOME/.local/bin/stash_wrapper.sh"
 alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
 # END dotfiles utilities
+source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
