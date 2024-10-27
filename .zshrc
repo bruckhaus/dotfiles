@@ -155,3 +155,6 @@ alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
 # END dotfiles utilities
 source ~/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# allow using hash symbol as comment indicator rather than as a pattern matching operator:
+unsetopt EXTENDED_GLOB
