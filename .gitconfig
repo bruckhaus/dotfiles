@@ -17,3 +17,5 @@
 	helper = cache
 [core]
         pager = cat
+[pull]
+        rebase = true
