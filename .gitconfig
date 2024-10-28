@@ -15,3 +15,5 @@
 	ignored = !git ls-files -v | grep \"^S\"
 [credential]
 	helper = cache
+[core]
+        pager = cat
