@@ -51,6 +51,7 @@ alias pusht='git push --set-upstream $(git remote) $(git rev-parse --abbrev-ref 
 alias gu='git reset --soft HEAD\^'
 alias ga="git add"
 alias gc="git commit"
+alias gcm="git add . && git commit -m"
 
 # Common ls aliases
 alias ls="ls --color=auto"
