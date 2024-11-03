@@ -11,6 +11,8 @@ from rich.text import Text
 from rich.table import Table
 from rich.theme import Theme
 import sys
+import platform
+import subprocess
 
 # Constants
 
@@ -441,6 +443,96 @@ CONFIG = load_config()
 custom_theme = create_custom_theme(CONFIG)
 console = Console(theme=custom_theme)
 
+class InstallSoftwareCommand(Command):
+    def __init__(self, name, check_command, install_commands, default_command=None):
+        self.name = name
+        self.check_command = check_command
+        self.install_commands = install_commands
+        self.default_command = default_command
+
+    def execute(self, dry_run=False):
+        if not self.is_installed():
+            if dry_run:
+                console.print(f"[cyan]Dry run: Would install {self.name}[/cyan]")
+            else:
+                console.print(f"[yellow]Installing {self.name}...[/yellow]")
+                os_type = platform.system()
+                install_command = self.install_commands.get(os_type, self.default_command)
+                if install_command:
+                    os.system(install_command)
+                else:
+                    console.print(f"[red]Unsupported OS for automatic {self.name} installation.[/red]")
+        else:
+            console.print(f"[green]{self.name} is already installed.[/green]")
+
+    def is_installed(self):
+        return shutil.which(self.check_command) is not None
+
+class InstallHubCommand(InstallSoftwareCommand):
+    def __init__(self):
+        super().__init__(
+            name="hub",
+            check_command="hub",
+            install_commands={
+                "Darwin": "brew install hub",
+                "Linux": "sudo apt-get update && sudo apt-get install -y hub"
+            }
+        )
+
+class InstallOhMyZshCommand(InstallSoftwareCommand):
+    def __init__(self):
+        super().__init__(
+            name="oh-my-zsh",
+            check_command="~/.oh-my-zsh",
+            install_commands={},
+            default_command=
+                'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+        )
+
+class InstallZshAutosuggestionsCommand(InstallSoftwareCommand):
+    def __init__(self):
+        super().__init__(
+            name="zsh-autosuggestions",
+            check_command="~/.oh-my-zsh/custom/plugins/zsh-autosuggestions",
+            install_commands={},
+            default_command='git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions'
+        )
+
+class InstallZshSyntaxHighlightingCommand(InstallSoftwareCommand):
+    def __init__(self):
+        super().__init__(
+            name="zsh-syntax-highlighting",
+            check_command="~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting",
+            install_commands={},
+            default_command='git clone https://github.com/zsh-users/zsh-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting'
+        )
+
+class InstallPythonVenvCommand(InstallSoftwareCommand):
+    def __init__(self):
+        super().__init__(
+            name="python3-venv",
+            check_command="python3 -m venv",
+            install_commands={
+                "Linux": "sudo apt-get update && sudo apt-get install -y python3-venv"
+            }
+        )
+
+    def is_installed(self):
+        if platform.system() == "Linux" and self.is_debian_based():
+            try:
+                subprocess.run(['python3', '-m', 'venv', '--help'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                return True
+            except subprocess.CalledProcessError:
+                return False
+        return True  # Assume installed on non-Linux systems
+
+    def is_debian_based(self):
+        try:
+            with open('/etc/os-release') as f:
+                return 'debian' in f.read().lower() or 'ubuntu' in f.read().lower()
+        except FileNotFoundError:
+            return False
+
 def main():
     try:
         parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
@@ -461,7 +553,12 @@ def main():
         commands = [
             InstallDotfilesCommand(config),
             GenerateWrapperScriptsCommand(config),
-            UpdateZshrcAliasesCommand(config)
+            UpdateZshrcAliasesCommand(config),
+            InstallOhMyZshCommand(),
+            InstallZshAutosuggestionsCommand(),
+            InstallZshSyntaxHighlightingCommand(),
+            InstallHubCommand(),
+            InstallPythonVenvCommand()
         ]
 
         changes_made = False
