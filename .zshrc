@@ -42,6 +42,7 @@ alias gpod="git pull origin develop"
 alias gb="git branch"
 alias gco="git checkout"
 alias gd="git diff"
+alias gdp="GIT_PAGER=less git diff --color"
 alias gdd='git diff origin/main..HEAD'
 alias gddc="git --no-pager diff --cached"
 alias gt='git branch -u $(git remote)/$(git rev-parse --abbrev-ref HEAD)'
