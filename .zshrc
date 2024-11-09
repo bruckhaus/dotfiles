@@ -64,6 +64,7 @@ alias lls='ls -lSh'
 
 # python:
 alias python=python3
+alias ptc="pytest --color=yes"
 alias ptest='python -m unittest discover'
 alias venv='source .env/bin/activate'
 export PYTHONPATH=.:$PYTHONPATH
