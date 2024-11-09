@@ -141,7 +141,7 @@ symbol = "\u2699"
 command = "[ -n $VIRTUAL_ENV ] && echo ${VIRTUAL_ENV##*/}"
 when = "test -n \"$VIRTUAL_ENV\""
 style = "fg:color_fg0 bg:color_green"
-format = '[[$symbol( $output) ](fg:color_fg0 bg:color_blue)]($style)'
+format = '[[$symbol($output) ](fg:color_fg0 bg:color_blue)]($style)'
 
 [python]
 symbol = ""
