@@ -66,9 +66,32 @@ alias lls='ls -lSh'
 alias python=python3
 alias ptc="pytest --color=yes"
 alias ptest='python -m unittest discover'
-alias venv='source .env/bin/activate'
 export PYTHONPATH=.:$PYTHONPATH
 export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
+unalias venv 2>/dev/null
+
+venv() {
+  # Define color codes for output
+  GREEN='\033[0;32m'
+  YELLOW='\033[0;33m'
+  NC='\033[0m' # No color
+
+  # Check if a virtual environment is already active
+  if [[ -n "$VIRTUAL_ENV" ]]; then
+    echo -e "${YELLOW}venv already active at: $VIRTUAL_ENV${NC}"
+  else
+    # Check if the venv directory exists
+    if [[ -d "venv/bin" ]]; then
+      # Activate the virtual environment
+      source venv/bin/activate
+      echo "No active venv found..."
+      echo -e "${GREEN}venv activated${NC}"
+      echo "venv directory: $VIRTUAL_ENV"
+    else
+      echo "Error: venv directory not found"
+    fi
+  fi
+}
 
 # other aliases:
 alias less='less -R'
