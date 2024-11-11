@@ -66,6 +66,7 @@ alias lls='ls -lSh'
 alias python=python3
 alias ptc="pytest --color=yes"
 alias ptest='python -m unittest discover'
+alias pint='pytest -v -m "integration"'
 alias punt='pytest -v -m "not integration"'
 export PYTHONPATH=.:$PYTHONPATH
 export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
