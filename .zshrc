@@ -107,6 +107,7 @@ export PATH=$PATH:/usr/sbin
 export PATH=$PATH:/usr/local/bin
 export PATH=$PATH:/usr/local/sbin
 export PATH=$PATH:/usr/local/git/bin
+export PATH="$HOME/google-cloud-sdk/bin:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
 
 # source local profile (company environment variables, etc.)
