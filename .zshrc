@@ -31,7 +31,6 @@ source $ZSH/oh-my-zsh.sh
 eval "$(starship init zsh)"
 
 # git:
-alias git=hub
 alias gs="git status"
 alias glm='git --no-pager log origin/main..HEAD --pretty=oneline'
 alias gnp='git --no-pager log --pretty=oneline origin/`gbn`..`gbn`'

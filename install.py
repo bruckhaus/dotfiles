@@ -483,11 +483,61 @@ class InstallOhMyZshCommand(InstallSoftwareCommand):
     def __init__(self):
         super().__init__(
             name="oh-my-zsh",
-            check_command="~/.oh-my-zsh",
+            check_command="~/.oh-my-zsh/oh-my-zsh.sh",
             install_commands={},
-            default_command=
-                'sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"'
+            default_command='git clone https://github.com/ohmyzsh/ohmyzsh.git ~/.oh-my-zsh'
         )
+
+    def is_installed(self):
+        oh_my_zsh_path = os.path.expanduser("~/.oh-my-zsh/oh-my-zsh.sh")
+        return os.path.exists(oh_my_zsh_path)
+
+    def execute(self, dry_run=False):
+        if not self.is_installed():
+            if dry_run:
+                console.print(f"[cyan]Dry run: Would install {self.name}[/cyan]")
+            else:
+                console.print(f"[yellow]Installing {self.name}...[/yellow]")
+                
+                # Backup existing .zshrc if it exists
+                zshrc_path = os.path.expanduser("~/.zshrc")
+                if os.path.exists(zshrc_path):
+                    backup_path = zshrc_path + ".pre-oh-my-zsh"
+                    shutil.copy2(zshrc_path, backup_path)
+                    console.print(f"[yellow]Backed up existing .zshrc to {backup_path}[/yellow]")
+                
+                # Remove existing .oh-my-zsh directory if it exists
+                oh_my_zsh_dir = os.path.expanduser("~/.oh-my-zsh")
+                if os.path.exists(oh_my_zsh_dir):
+                    shutil.rmtree(oh_my_zsh_dir)
+                
+                # Clone Oh My Zsh repository
+                if os.system(self.default_command) == 0:
+                    console.print(f"[green]{self.name} installed successfully.[/green]")
+                    
+                    # Verify installation
+                    if not self.is_installed():
+                        console.print(f"[red]Installation verification failed. Oh My Zsh files not found.[/red]")
+                        return False
+                    
+                    # Restore original .zshrc if it was backed up
+                    if os.path.exists(backup_path):
+                        shutil.copy2(backup_path, zshrc_path)
+                        console.print("[green]Restored original .zshrc[/green]")
+                    
+                    # Ensure ZSH variable is set in .zshrc
+                    with open(zshrc_path, 'r') as f:
+                        content = f.read()
+                    if 'ZSH=' not in content:
+                        with open(zshrc_path, 'a') as f:
+                            f.write('\nZSH="$HOME/.oh-my-zsh"\n')
+                else:
+                    console.print(f"[red]Failed to install {self.name}[/red]")
+                    return False
+        else:
+            console.print(f"[green]{self.name} is already installed.[/green]")
+        
+        return True
 
 class InstallZshAutosuggestionsCommand(InstallSoftwareCommand):
     def __init__(self):
@@ -551,14 +601,14 @@ def main():
         config = load_config()
 
         commands = [
-            InstallDotfilesCommand(config),
-            GenerateWrapperScriptsCommand(config),
-            UpdateZshrcAliasesCommand(config),
             InstallOhMyZshCommand(),
             InstallZshAutosuggestionsCommand(),
             InstallZshSyntaxHighlightingCommand(),
             InstallHubCommand(),
-            InstallPythonVenvCommand()
+            InstallPythonVenvCommand(),
+            InstallDotfilesCommand(config),
+            GenerateWrapperScriptsCommand(config),
+            UpdateZshrcAliasesCommand(config),
         ]
 
         changes_made = False
