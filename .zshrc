@@ -12,6 +12,7 @@ setopt AUTO_CD
 unsetopt EXTENDED_GLOB
 # Completion settings
 zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}' 'r:|[._-]=* r:|=*' 'l:|=* r:|=*'
+setopt MENU_COMPLETE
 DISABLE_UPDATE_PROMPT=true
 ZSH=$HOME/.oh-my-zsh
 # Plugin configuration
