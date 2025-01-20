@@ -13,9 +13,9 @@
 	ignore = update-index --skip-worktree
 	unignore = update-index --no-skip-worktree
 	ignored = !git ls-files -v | grep \"^S\"
-[credential]
-	helper = cache
 [core]
         pager = cat
 [pull]
         rebase = true
+[http]
+	postBuffer = 524288000
