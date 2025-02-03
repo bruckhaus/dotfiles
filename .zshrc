@@ -53,6 +53,7 @@ alias gu='git reset --soft HEAD\^'
 alias ga="git add"
 alias gc="git commit"
 alias gcm="git add . && git commit -m"
+alias gan="git add . -n"
 
 # Common ls aliases
 alias ls="ls --color=auto"
