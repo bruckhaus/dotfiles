@@ -547,6 +547,10 @@ class InstallZshAutosuggestionsCommand(InstallSoftwareCommand):
             install_commands={},
             default_command='git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions'
         )
+    
+    def is_installed(self):
+        plugin_path = os.path.expanduser("~/.oh-my-zsh/custom/plugins/zsh-autosuggestions")
+        return os.path.exists(plugin_path)
 
 class InstallZshSyntaxHighlightingCommand(InstallSoftwareCommand):
     def __init__(self):
@@ -556,6 +560,10 @@ class InstallZshSyntaxHighlightingCommand(InstallSoftwareCommand):
             install_commands={},
             default_command='git clone https://github.com/zsh-users/zsh-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting'
         )
+    
+    def is_installed(self):
+        plugin_path = os.path.expanduser("~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting")
+        return os.path.exists(plugin_path)
 
 class InstallPythonVenvCommand(InstallSoftwareCommand):
     def __init__(self):

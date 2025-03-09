@@ -29,6 +29,31 @@ config = {
     saturation = 0.8,
     brightness = 0.3,
   },
+  -- Add colors configuration to make pane borders more visible
+  colors = {
+    tab_bar = {
+      background = '#1f2730',
+      active_tab = {
+        bg_color = "#993333",
+        fg_color = "#cccccc",
+      },
+      inactive_tab = {
+        bg_color = "#1f2730",
+        fg_color = "#707070",
+      },
+    },
+  },
+  window_frame = {
+    -- Background color when the window is active/focused
+    active_titlebar_bg = '#333333',
+    
+    -- Background color when the window is inactive
+    inactive_titlebar_bg = '#2b2042',
+    
+    -- Optional: customize the font used in the title bar
+    font = wezterm.font { family = 'Roboto', weight = 'Bold' },
+    font_size = 22.0,
+  },
   background = {
     {
       source = {
