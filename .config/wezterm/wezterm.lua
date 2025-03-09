@@ -24,6 +24,11 @@ config = {
     top = 0,
     bottom = 0,
   },
+  -- Make pane splits more apparent by dimming inactive panes
+  inactive_pane_hsb = {
+    saturation = 0.8,
+    brightness = 0.3,
+  },
   background = {
     {
       source = {
