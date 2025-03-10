@@ -101,15 +101,17 @@ alias less='less -R'
 alias ccat='pygmentize -g'
 
 # path:
-export PATH=$PATH:/bin
-export PATH=$PATH:/sbin
-export PATH=$PATH:/usr/bin
-export PATH=$PATH:/usr/sbin
-export PATH=$PATH:/usr/local/bin
-export PATH=$PATH:/usr/local/sbin
+export PATH=$PATH:"$HOME/google-cloud-sdk/bin"
+export PATH=$PATH:"$HOME/.local/bin"
+export PATH=$PATH:/opt/homebrew/bin/brew
+export PATH=$PATH:/usr/local/opt/node@18/bin
 export PATH=$PATH:/usr/local/git/bin
-export PATH="$HOME/google-cloud-sdk/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH=$PATH:/usr/local/sbin
+export PATH=$PATH:/usr/local/bin
+export PATH=$PATH:/usr/sbin
+export PATH=$PATH:/usr/bin
+export PATH=$PATH:/sbin
+export PATH=$PATH:/bin
 
 # source local profile (company environment variables, etc.)
 export LOCAL_PROFILE=${HOME}/.local_profile.sh
