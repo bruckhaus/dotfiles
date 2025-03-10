@@ -70,7 +70,6 @@ alias ptest='python -m unittest discover'
 alias pint='pytest -v -m "integration"'
 alias punt='pytest -v -m "not integration"'
 export PYTHONPATH=.:$PYTHONPATH
-export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
 unalias venv 2>/dev/null
 
 venv() {
@@ -101,17 +100,23 @@ alias less='less -R'
 alias ccat='pygmentize -g'
 
 # path:
-export PATH=$PATH:"$HOME/google-cloud-sdk/bin"
-export PATH=$PATH:"$HOME/.local/bin"
-export PATH=$PATH:/opt/homebrew/bin/brew
-export PATH=$PATH:/usr/local/opt/node@18/bin
-export PATH=$PATH:/usr/local/git/bin
-export PATH=$PATH:/usr/local/sbin
-export PATH=$PATH:/usr/local/bin
-export PATH=$PATH:/usr/sbin
-export PATH=$PATH:/usr/bin
-export PATH=$PATH:/sbin
-export PATH=$PATH:/bin
+# PATH organization: most specific/important paths first, system paths last
+# Using prepending style consistently for correct priority order
+
+# Start with system base paths (will end up at the end of PATH)
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Homebrew and package manager paths
+export PATH="/opt/homebrew/opt/node@18/bin:$PATH"  # ARM64 Node.js
+export PATH="/opt/homebrew/bin/brew:$PATH"
+export PATH="/usr/local/git/bin:$PATH"
+
+# Programming language specific paths
+export PATH="/Library/Frameworks/Python.framework/Versions/3.11/bin:$PATH"
+
+# User specific paths and tools
+export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/google-cloud-sdk/bin:$PATH"
 
 # source local profile (company environment variables, etc.)
 export LOCAL_PROFILE=${HOME}/.local_profile.sh
