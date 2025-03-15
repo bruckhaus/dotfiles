@@ -591,6 +591,28 @@ class InstallPythonVenvCommand(InstallSoftwareCommand):
         except FileNotFoundError:
             return False
 
+# Import the StarshipInstaller from our new module
+try:
+    from installers.starship_installer import StarshipInstaller
+    
+    class InstallStarshipCommand(Command):
+        def __init__(self):
+            self.installer = StarshipInstaller(console=console)
+        
+        def execute(self, dry_run=False):
+            return self.installer.execute(dry_run=dry_run)
+except ImportError:
+    # Fallback if the module is not available
+    console.print("[yellow]Warning: starship_installer module not found. Skipping Starship installation.[/yellow]")
+    
+    class InstallStarshipCommand(Command):
+        def __init__(self):
+            pass
+        
+        def execute(self, dry_run=False):
+            console.print("[yellow]Starship installer module not found. Please run 'install_starship.py' separately.[/yellow]")
+            return False
+
 def main():
     try:
         parser = argparse.ArgumentParser(description='Install dotfiles', add_help=False)
@@ -614,6 +636,7 @@ def main():
             InstallZshSyntaxHighlightingCommand(),
             InstallHubCommand(),
             InstallPythonVenvCommand(),
+            InstallStarshipCommand(),
             InstallDotfilesCommand(config),
             GenerateWrapperScriptsCommand(config),
             UpdateZshrcAliasesCommand(config),

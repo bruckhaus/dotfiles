@@ -29,7 +29,6 @@ ZSH_HIGHLIGHT_STYLES[path_prefix]=none
 ZSH_THEME=""
 source $ZSH/oh-my-zsh.sh
 # Starship prompt (after sourcing oh-my-zsh.sh)
-eval "$(starship init zsh)"
 
 # git:
 alias gs="git status"
@@ -133,3 +132,8 @@ export NVM_ARCH=arm64
 alias stash="$HOME/.local/bin/stash_wrapper.sh"
 alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
 # END dotfiles utilities
+
+# Initialize starship prompt
+if command -v starship &> /dev/null; then
+  eval "$(starship init zsh)"
+fi

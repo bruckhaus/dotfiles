@@ -18,3 +18,9 @@ fi
 unset __conda_setup
 # <<< conda initialize <<<
 
+
+
+# Initialize starship prompt
+if command -v starship &> /dev/null; then
+  eval "$(starship init bash)"
+fi
