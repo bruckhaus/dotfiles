@@ -50,6 +50,8 @@ class StarshipInstaller:
             changes = self.ensure_proper_initialization(dry_run)
             # Install Nerd Font if needed
             changes |= self.install_nerd_font(dry_run)
+            # Ask about icon rendering and offer no-nerd-font preset if needed
+            changes |= self.check_icon_rendering(dry_run)
             return changes
         
         if dry_run:
@@ -77,6 +79,9 @@ class StarshipInstaller:
         
         # Install Nerd Font
         changes |= self.install_nerd_font(dry_run=False)
+        
+        # Ask about icon rendering and offer no-nerd-font preset if needed
+        changes |= self.check_icon_rendering(dry_run=False)
         
         self.log(f"Starship installed successfully!", style="green")
         return True
@@ -606,6 +611,74 @@ class StarshipInstaller:
         
         self.log(f"Starship is already configured in Fish config", style="green")
         return False
+    
+    def check_icon_rendering(self, dry_run=False):
+        """
+        Ask the user if icons are rendering correctly and offer the no-nerd-font preset if needed.
+        
+        Args:
+            dry_run: If True, only show what would be done without making changes.
+            
+        Returns:
+            bool: True if changes were made, False otherwise.
+        """
+        # Skip in dry run mode
+        if dry_run:
+            self.log("Dry run: Would check if icons are rendering correctly", style="cyan")
+            return False
+        
+        self.log("\n[bold]Icon Rendering Check:[/bold]", style="yellow")
+        self.log("After restarting your terminal, you should see icons in your prompt.", style="yellow")
+        self.log("If icons don't display correctly, you can use the no-nerd-font preset.", style="yellow")
+        
+        # Ask the user if they want to apply the no-nerd-font preset now
+        response = input("\nDo you want to apply the no-nerd-font preset now? (y/n): ").strip().lower()
+        
+        if response == 'y' or response == 'yes':
+            return self.apply_no_nerd_font_preset(dry_run)
+        else:
+            self.log("\nIf you encounter icon rendering issues later, you can run:", style="yellow")
+            self.log("starship preset no-nerd-font -o ~/.config/starship.toml", style="cyan")
+            return False
+    
+    def apply_no_nerd_font_preset(self, dry_run=False):
+        """
+        Apply the no-nerd-font preset to the Starship configuration.
+        
+        Args:
+            dry_run: If True, only show what would be done without making changes.
+            
+        Returns:
+            bool: True if changes were made, False otherwise.
+        """
+        if dry_run:
+            self.log("Dry run: Would apply no-nerd-font preset to Starship configuration", style="cyan")
+            return True
+        
+        self.log("Applying no-nerd-font preset to Starship configuration...", style="yellow")
+        
+        try:
+            # Check if starship is in PATH
+            if not shutil.which("starship"):
+                # Add ~/.local/bin to PATH temporarily if needed
+                if os.path.exists(self.starship_path):
+                    os.environ['PATH'] = f"{self.local_bin_path}:{os.environ.get('PATH', '')}"
+            
+            # Apply the no-nerd-font preset
+            result = subprocess.run(
+                ["starship", "preset", "no-nerd-font", "-o", os.path.expanduser("~/.config/starship.toml")],
+                check=True
+            )
+            
+            self.log("Successfully applied no-nerd-font preset.", style="green")
+            self.log("Your Starship prompt will now use standard Unicode symbols instead of Nerd Font icons.", style="green")
+            return True
+            
+        except subprocess.SubprocessError as e:
+            self.log(f"Error applying no-nerd-font preset: {str(e)}", style="red")
+            self.log("You can manually apply the preset with:", style="yellow")
+            self.log("starship preset no-nerd-font -o ~/.config/starship.toml", style="cyan")
+            return False
 
 
 def main():
