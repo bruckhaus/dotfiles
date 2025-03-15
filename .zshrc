@@ -1,10 +1,5 @@
 #!/bin/sh
 
-# Early environment setup
-if [ -f ${HOME}/.bash_profile ]; then
-   source ${HOME}/.bash_profile
-fi
-
 # ZSH Options
 # change directory without typing "cd"
 setopt AUTO_CD
