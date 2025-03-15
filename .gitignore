@@ -7,3 +7,5 @@ hello.txt
 hello.zip
 hello/
 unzippy_test/
+
+*.pyc
