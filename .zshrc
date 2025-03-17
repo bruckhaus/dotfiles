@@ -131,4 +131,10 @@ alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
 # Initialize starship prompt
 if command -v starship &> /dev/null; then
   eval "$(starship init zsh)"
-fi
+fi 
+
+# The following lines have been added by Docker Desktop to enable Docker CLI completions.
+fpath=(/Users/tilmannbruckhaus/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
+# End of Docker CLI completions
