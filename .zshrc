@@ -48,6 +48,7 @@ alias ga="git add"
 alias gc="git commit"
 alias gcm="git add . && git commit -m"
 alias gan="git add . -n"
+alias gl="git log origin/main..HEAD"
 
 # Common ls aliases
 alias ls="ls --color=auto"
