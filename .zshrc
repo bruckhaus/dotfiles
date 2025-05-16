@@ -78,14 +78,14 @@ venv() {
     echo -e "${YELLOW}venv already active at: $VIRTUAL_ENV${NC}"
   else
     # Check if the venv directory exists
-    if [[ -d "venv/bin" ]]; then
+    if [[ -d ".venv/bin" ]]; then
       # Activate the virtual environment
-      source venv/bin/activate
+      source .venv/bin/activate
       echo "No active venv found..."
       echo -e "${GREEN}venv activated${NC}"
       echo "venv directory: $VIRTUAL_ENV"
     else
-      echo "Error: venv directory not found"
+      echo "Error: .venv directory not found"
     fi
   fi
 }
