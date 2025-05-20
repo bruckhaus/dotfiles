@@ -1,3 +1,8 @@
+# ~/.config/starship.toml
+# Increase the timeout for commands executed by Starship (in milliseconds)
+# Default is 500ms. Try a higher value like 1000ms (1 second) or more.
+command_timeout = 1000
+
 "$schema" = 'https://starship.rs/config-schema.json'
 
 format = """
