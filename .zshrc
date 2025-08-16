@@ -49,6 +49,8 @@ alias gc="git commit"
 alias gcm="git add . && git commit -m"
 alias gan="git add . -n"
 alias gl="git log origin/main..HEAD"
+alias gas="gh auth status"
+alias gauth="gh auth switch --user"
 
 # Common ls aliases
 alias ls="ls --color=auto"
@@ -103,7 +105,7 @@ export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 # Homebrew and package manager paths
 export PATH="/opt/homebrew/opt/node@18/bin:$PATH"  # ARM64 Node.js
-export PATH="/opt/homebrew/bin/brew:$PATH"
+export PATH="/opt/homebrew/bin:$PATH"
 export PATH="/usr/local/git/bin:$PATH"
 
 # Programming language specific paths
