@@ -26,6 +26,23 @@ source $ZSH/oh-my-zsh.sh
 # Starship prompt (after sourcing oh-my-zsh.sh)
 
 # git:
+git_push_preview() {
+  # Color output: label vs value
+  local LABEL='\033[1;36m'
+  local VALUE='\033[0;33m'
+  local DIM='\033[2m'
+  local NC='\033[0m'
+
+  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u})
+  echo -e "${LABEL}Upstream${NC}${DIM} (where you will push to)${NC}: ${VALUE}${upstream}${NC}"
+  echo -e "${LABEL}Behind/Ahead${NC}${DIM} (left=behind, right=ahead)${NC}: ${VALUE}$(git rev-list --left-right --count @{u}...HEAD)${NC}"
+  echo -e "${LABEL}Commits to push${NC}: ${VALUE}$(git rev-list --count @{u}..HEAD)${NC}"
+  echo -e "${LABEL}Commit list${NC}${DIM} (new commits on your branch)${NC}:"
+  git log --oneline --decorate @{u}..HEAD
+  echo -e "${LABEL}Files changed${NC}${DIM} (what will change on remote after push)${NC}:"
+  git diff --name-status @{u}..HEAD
+}
+
 alias gs="git status"
 alias glm='git --no-pager log origin/main..HEAD --pretty=oneline'
 alias gnp='git --no-pager log --pretty=oneline origin/`gbn`..`gbn`'
@@ -49,6 +66,7 @@ alias gc="git commit"
 alias gcm="git add . && git commit -m"
 alias gan="git add . -n"
 alias gl="git log origin/main..HEAD"
+alias gpp='git_push_preview'
 alias gas="gh auth status"
 alias gauth="gh auth switch --user"
 
