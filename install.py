@@ -78,7 +78,7 @@ class WrapperScript:
 
     def _generate_content(self):
         return f"""#!/bin/bash
-{self.script_dir}/venv/bin/python {self.script_dir}/{self.script_name} "$@"
+{self.script_dir}/.venv/bin/python {self.script_dir}/{self.script_name} "$@"
 """
 
     def get_status(self):
