@@ -155,10 +155,10 @@ if command -v starship &> /dev/null; then
 fi 
 
 # The following lines have been added by Docker Desktop to enable Docker CLI completions.
-fpath=(/Users/tilmannbruckhaus/.docker/completions $fpath)
+fpath=($HOME/.docker/completions $fpath)
 autoload -Uz compinit
 compinit
 # End of Docker CLI completions
 
 # Added by Windsurf
-export PATH="/Users/tilmannbruckhaus/.codeium/windsurf/bin:$PATH"
+export PATH="$HOME/.codeium/windsurf/bin:$PATH"

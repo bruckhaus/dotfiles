@@ -8,8 +8,8 @@ dotfiles:
   - .config/starship.toml
 
 scripts:
-  - stash.py
-  - unzippy.py
+  - scripts/stash.py
+  - scripts/unzippy.py
 
 aliases:
   - name: stash

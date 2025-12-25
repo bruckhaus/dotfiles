@@ -5,9 +5,12 @@ venv
 .venv
 .venv_backup
 
+__pycache__
+*.py[cod]
+*.log
+.DS_Store
+
 hello.txt
 hello.zip
 hello/
 unzippy_test/
-
-*.pyc

@@ -70,7 +70,7 @@ class UpdateZshrcAliasesCommand(Command):
 class WrapperScript:
     def __init__(self, script_name, install_dir, script_dir):
         self.script_name = script_name
-        self.wrapper_name = script_name.replace('.py', '_wrapper.sh')
+        self.wrapper_name = os.path.splitext(os.path.basename(script_name))[0] + '_wrapper.sh'
         self.install_dir = install_dir
         self.script_dir = script_dir
         self.wrapper_path = os.path.join(install_dir, self.wrapper_name)
