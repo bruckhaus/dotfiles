@@ -43,6 +43,32 @@ git_push_preview() {
   git diff --name-status @{u}..HEAD
 }
 
+git_go() {
+  local dotfiles_root="${DOTFILES_REPO:-$HOME/dev/dotfiles}"
+  local helper="$dotfiles_root/scripts/git_go.py"
+
+  if [[ ! -f "$helper" ]]; then
+    echo "git_go helper not found at $helper" >&2
+    return 1
+  fi
+
+  local output
+  output=$(python3 "$helper" "$@")
+  local exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    [[ -n "$output" ]] && printf "%s\n" "$output"
+    return $exit_code
+  fi
+
+  if [[ -d "$output" ]]; then
+    cd "$output" || return $?
+    return 0
+  fi
+
+  [[ -n "$output" ]] && printf "%s\n" "$output"
+}
+
 alias gs="git status"
 alias glm='git --no-pager log origin/main..HEAD --pretty=oneline'
 alias gnp='git --no-pager log --pretty=oneline origin/`gbn`..`gbn`'
@@ -69,6 +95,8 @@ alias gl="git log origin/main..HEAD"
 alias gpp='git_push_preview'
 alias gas="gh auth status"
 alias gauth="gh auth switch --user"
+alias gg='git_go'
+alias gitgo='git_go'
 
 # Common ls aliases
 alias ls="ls --color=auto"
