@@ -27,20 +27,15 @@ source $ZSH/oh-my-zsh.sh
 
 # git:
 git_push_preview() {
-  # Color output: label vs value
-  local LABEL='\033[1;36m'
-  local VALUE='\033[0;33m'
-  local DIM='\033[2m'
-  local NC='\033[0m'
+  local dotfiles_root="${DOTFILES_REPO:-$HOME/dev/dotfiles}"
+  local helper="$dotfiles_root/scripts/git_push_preview.py"
 
-  upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{u})
-  echo -e "${LABEL}Upstream${NC}${DIM} (where you will push to)${NC}: ${VALUE}${upstream}${NC}"
-  echo -e "${LABEL}Behind/Ahead${NC}${DIM} (left=behind, right=ahead)${NC}: ${VALUE}$(git rev-list --left-right --count @{u}...HEAD)${NC}"
-  echo -e "${LABEL}Commits to push${NC}: ${VALUE}$(git rev-list --count @{u}..HEAD)${NC}"
-  echo -e "${LABEL}Commit list${NC}${DIM} (new commits on your branch)${NC}:"
-  git log --oneline --decorate @{u}..HEAD
-  echo -e "${LABEL}Files changed${NC}${DIM} (what will change on remote after push)${NC}:"
-  git diff --name-status @{u}..HEAD
+  if [[ ! -f "$helper" ]]; then
+    echo "git_push_preview helper not found at $helper" >&2
+    return 1
+  fi
+
+  python3 "$helper" "$@"
 }
 
 git_go() {
