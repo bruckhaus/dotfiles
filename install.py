@@ -4,6 +4,7 @@ import os
 import argparse
 import shutil
 import yaml
+import time
 from abc import ABC, abstractmethod
 from rich.console import Console
 from rich.panel import Panel
@@ -66,6 +67,13 @@ class UpdateZshrcAliasesCommand(Command):
 
     def execute(self, dry_run=False):
         return update_zshrc_aliases(dry_run)
+
+class SetupEnvironmentFilesCommand(Command):
+    def __init__(self, config):
+        self.config = config
+
+    def execute(self, dry_run=False):
+        return setup_environment_files(dry_run)
 
 class WrapperScript:
     def __init__(self, script_name, install_dir, script_dir):
@@ -363,6 +371,84 @@ def extract_existing_section(content, start_marker, end_marker):
 def generate_aliases_content(aliases):
     return '\n'.join(f"alias {alias['name']}=\"{alias['command']}\"" for alias in aliases)
 
+def setup_environment_files(dry_run=False):
+    """Setup .env.local symlinks for secure environment management."""
+    here = os.path.dirname(os.path.realpath(__file__))
+    
+    env_files = [
+        ('.env.example', '.env.example'),
+        ('.env.local', '.env.local'),
+        ('.env', '.env'),
+    ]
+    
+    env_table = Table(title="Environment Files Status")
+    env_table.add_column("File", style="cyan", no_wrap=True)
+    env_table.add_column("Status", style="green")
+    
+    changes_made = []
+    
+    for source_file, target_file in env_files:
+        source_path = os.path.join(here, source_file)
+        target_path = os.path.join(os.path.expanduser('~'), target_file)
+        
+        # Handle .env.example - copy if not exists
+        if source_file == '.env.example':
+            if os.path.exists(target_path):
+                status = "[green]Up to date[/green]"
+            else:
+                status = "[yellow]New[/yellow]"
+                changes_made.append((source_path, target_path, 'copy'))
+        # Handle .env.local - create symlink if missing, handle conversion if regular file
+        elif source_file == '.env.local':
+            if os.path.islink(target_path):
+                if os.readlink(target_path) == source_path:
+                    status = "[green]Up to date (symlink)[/green]"
+                else:
+                    status = "[yellow]Needs update (wrong symlink)[/yellow]"
+                    changes_made.append((source_path, target_path, 'symlink'))
+            elif os.path.exists(target_path):
+                status = "[yellow]Convert to symlink[/yellow]"
+                changes_made.append((source_path, target_path, 'convert'))
+            else:
+                status = "[yellow]New[/yellow]"
+                changes_made.append((source_path, target_path, 'symlink'))
+        
+        env_table.add_row(target_file, status)
+    
+    console.print(env_table)
+    
+    if changes_made and not dry_run:
+        for source_path, target_path, action in changes_made:
+            if action == 'copy':
+                console.print(f"\n[cyan]Creating {os.path.basename(target_path)}...[/cyan]")
+                shutil.copy2(source_path, target_path)
+                console.print(f"[green]✓ Created {target_path}[/green]")
+            elif action == 'symlink':
+                console.print(f"\n[cyan]Creating symlink for {os.path.basename(target_path)}...[/cyan]")
+                os.symlink(source_path, target_path)
+                console.print(f"[green]✓ Created symlink {target_path} -> {source_path}[/green]")
+            elif action == 'convert':
+                console.print(f"\n[cyan]Converting {os.path.basename(target_path)} to symlink...[/cyan]")
+                # Backup existing file
+                backup_path = target_path + '.backup.' + str(int(time.time()))
+                shutil.copy2(target_path, backup_path)
+                console.print(f"[yellow]✓ Backed up to {backup_path}[/yellow]")
+                # Remove and create symlink
+                os.remove(target_path)
+                os.symlink(source_path, target_path)
+                console.print(f"[green]✓ Created symlink {target_path} -> {source_path}[/green]")
+    
+    if changes_made:
+        if dry_run:
+            console.print("[dim]Dry run: Environment file changes would be made.[/dim]")
+        else:
+            console.print("[green]Environment files setup complete![/green]")
+            console.print("[yellow]💡 Edit ~/.env.local to add your API keys[/yellow]")
+    else:
+        console.print("[green]Environment files already configured correctly.[/green]")
+    
+    return bool(changes_made)
+
 def update_zshrc_aliases(dry_run=False):
     here = os.path.dirname(os.path.realpath(__file__))
     zshrc_path = os.path.join(here, '.zshrc')
@@ -371,7 +457,7 @@ def update_zshrc_aliases(dry_run=False):
     end_marker = CONFIG['settings']['zshrc_end_marker']
     aliases = CONFIG['aliases']
 
-    # Update or add the stash and unzippy aliases
+    # Update or add stash and unzippy aliases
     for alias_name in ['stash', 'unzippy']:
         alias = next((a for a in aliases if a['name'] == alias_name), None)
         if alias:
@@ -399,18 +485,18 @@ def update_zshrc_aliases(dry_run=False):
 
         if changes_needed:
             if not dry_run:
-                # Ensure we're only replacing the existing section, not appending
+                # Ensure we're only replacing existing section, not appending
                 if existing_section:
                     updated_content = content.replace(existing_section, new_section)
                 else:
-                    # If no existing section, append to the end of the file
+                    # If no existing section, append to end of file
                     updated_content = content + "\n" + new_section
 
                 with open(zshrc_path, 'w') as file:
                     file.write(updated_content)
                 console.print("Updated .zshrc with new aliases.")
             else:
-                console.print("Dry run: Would update .zshrc with the following changes:")
+                console.print("Dry run: Would update .zshrc with following changes:")
                 console.print(f"Existing section:\n{existing_section}")
                 console.print(f"New section:\n{new_section}")
         else:
@@ -637,6 +723,7 @@ def main():
             InstallHubCommand(),
             InstallPythonVenvCommand(),
             InstallStarshipCommand(),
+            SetupEnvironmentFilesCommand(config),
             InstallDotfilesCommand(config),
             GenerateWrapperScriptsCommand(config),
             UpdateZshrcAliasesCommand(config),

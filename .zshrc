@@ -93,6 +93,15 @@ alias gauth="gh auth switch --user"
 alias gg='git_go'
 alias gitgo='git_go'
 
+# START dotfiles utilities
+alias stash="$HOME/.local/bin/stash_wrapper.sh"
+alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
+alias pr="function _pr() { perplexity_rag "$*"; }; _pr"
+alias pn="function _pn() { perplexity ask --no-save-history "$*"; }; _pn"
+alias pk="function _pk() { perplexity ask-notes "$*"; }; _pk"
+alias pplxc="perplexity chat"
+# END dotfiles utilities
+
 # Common ls aliases
 alias ls="ls --color=auto"
 alias ll='ls -lah'
@@ -170,6 +179,10 @@ export NVM_ARCH=arm64
 # START dotfiles utilities
 alias stash="$HOME/.local/bin/stash_wrapper.sh"
 alias unzippy="$HOME/.local/bin/unzippy_wrapper.sh"
+alias pr="function _pr() { perplexity_rag "$*"; }; _pr"
+alias pn="function _pn() { perplexity ask --no-save-history "$*"; }; _pn"
+alias pk="function _pk() { perplexity ask-notes "$*"; }; _pk"
+alias pplxc="perplexity chat"
 # END dotfiles utilities
 
 # Initialize starship prompt
@@ -188,3 +201,10 @@ export PATH="$HOME/.codeium/windsurf/bin:$PATH"
 
 # opencode
 export PATH=/Users/tilmannbruckhaus/.opencode/bin:$PATH
+
+# Load environment variables from .env.local if it exists (gitignored for security)
+if [[ -f "$HOME/.env.local" ]]; then
+    set -a
+    source "$HOME/.env.local"
+    set +a
+fi

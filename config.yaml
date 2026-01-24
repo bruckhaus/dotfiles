@@ -6,16 +6,27 @@ dotfiles:
   - .zshrc
   - .config/wezterm
   - .config/starship.toml
+  - .env.example
+  - .env.local
 
 scripts:
   - scripts/stash.py
   - scripts/unzippy.py
+  - scripts/perplexity_rag.py
 
 aliases:
   - name: stash
     command: $HOME/.local/bin/stash_wrapper.sh $(pwd)
   - name: unzippy
     command: $HOME/.local/bin/unzippy_wrapper.sh
+  - name: pr
+    command: 'function _pr() { perplexity_rag "$*"; }; _pr'
+  - name: pn
+    command: 'function _pn() { perplexity ask --no-save-history "$*"; }; _pn'
+  - name: pk
+    command: 'function _pk() { perplexity ask-notes "$*"; }; _pk'
+  - name: pplxc
+    command: perplexity chat
 
 settings:
   install_dir: ~/.local/bin

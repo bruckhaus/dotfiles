@@ -14,3 +14,8 @@ hello.txt
 hello.zip
 hello/
 unzippy_test/
+
+# Environment files with secrets
+.env
+.env.local
+.envrc
