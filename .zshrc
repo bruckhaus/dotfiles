@@ -185,3 +185,6 @@ compinit
 
 # Added by Windsurf
 export PATH="$HOME/.codeium/windsurf/bin:$PATH"
+
+# opencode
+export PATH=/Users/tilmannbruckhaus/.opencode/bin:$PATH

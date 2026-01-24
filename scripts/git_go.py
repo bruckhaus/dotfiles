@@ -16,12 +16,15 @@ from typing import Dict, Iterable, List, Sequence, TypedDict
 DEFAULT_CACHE_PATH = os.path.expanduser(
     os.environ.get("GIT_GO_CACHE", "~/.cache/git_go/repos.json")
 )
-DEFAULT_CACHE_TTL = int(os.environ.get("GIT_GO_CACHE_TTL", "300"))
+DEFAULT_CACHE_TTL = int(
+    os.environ.get("GIT_GO_CACHE_TTL", str(7 * 24 * 60 * 60))
+)
 
 
-class CacheEntry(TypedDict):
+class CacheEntry(TypedDict, total=False):
     timestamp: float
     repos: List[str]
+    ttl: int
 
 
 CacheData = Dict[str, CacheEntry]
@@ -164,8 +167,11 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser.add_argument(
         "--cache-ttl",
         type=int,
-        default=DEFAULT_CACHE_TTL,
-        help="Seconds before cache is considered stale (default: %(default)s).",
+        default=None,
+        help=(
+            "Seconds before cache is considered stale. "
+            "Passing this flag also persists the new default for future runs."
+        ),
     )
     parser.add_argument(
         "--refresh-cache",
@@ -188,8 +194,10 @@ def load_cache(path: str) -> CacheData:
                 root: CacheEntry(
                     timestamp=entry["timestamp"],
                     repos=entry["repos"],
+                    ttl=entry.get("ttl"),
                 )
                 for root, entry in data.items()
+                if isinstance(entry, dict)
             }
     except FileNotFoundError:
         return {}
@@ -199,8 +207,18 @@ def load_cache(path: str) -> CacheData:
 
 def save_cache(path: str, cache: CacheData) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    serializable: Dict[str, Dict[str, object]] = {}
+    for root, entry in cache.items():
+        payload: Dict[str, object] = {
+            "timestamp": entry["timestamp"],
+            "repos": entry["repos"],
+        }
+        ttl = entry.get("ttl")
+        if ttl is not None:
+            payload["ttl"] = ttl
+        serializable[root] = payload
     with open(path, "w", encoding="utf-8") as fh:
-        json.dump(cache, fh)
+        json.dump(serializable, fh)
 
 
 def get_cached_repos(cache: CacheData, root: str, ttl: int) -> List[str] | None:
@@ -212,6 +230,16 @@ def get_cached_repos(cache: CacheData, root: str, ttl: int) -> List[str] | None:
     return entry["repos"]
 
 
+def determine_effective_ttl(args: argparse.Namespace, entry: CacheEntry | None) -> int:
+    if args.cache_ttl is not None:
+        return args.cache_ttl
+    if entry:
+        cached_ttl = entry.get("ttl")
+        if cached_ttl is not None:
+            return cached_ttl
+    return DEFAULT_CACHE_TTL
+
+
 def main(argv: Iterable[str]) -> int:
     args = parse_args(argv)
     root = os.path.abspath(os.path.expanduser(args.root))
@@ -220,19 +248,35 @@ def main(argv: Iterable[str]) -> int:
         print(f"Root directory '{root}' does not exist.", file=sys.stderr)
         return 1
 
+    cache_path = os.path.expanduser(args.cache_file)
     cache_data: CacheData = {}
     repos: List[str] | None = None
+    cache_entry: CacheEntry | None = None
 
     if not args.no_cache:
-        cache_data = load_cache(os.path.expanduser(args.cache_file))
-        if not args.refresh_cache:
-            repos = get_cached_repos(cache_data, root, args.cache_ttl)
+        cache_data = load_cache(cache_path)
+        cache_entry = cache_data.get(root)
+
+    effective_ttl = determine_effective_ttl(args, cache_entry)
+
+    if not args.no_cache and args.cache_ttl is not None and cache_entry:
+        if cache_entry.get("ttl") != args.cache_ttl:
+            cache_entry["ttl"] = args.cache_ttl
+            cache_data[root] = cache_entry
+            save_cache(cache_path, cache_data)
+
+    if not args.no_cache and not args.refresh_cache:
+        repos = get_cached_repos(cache_data, root, effective_ttl)
 
     if repos is None:
         repos = find_git_repos(root)
         if not args.no_cache:
-            cache_data[root] = CacheEntry(timestamp=time.time(), repos=repos)
-            save_cache(os.path.expanduser(args.cache_file), cache_data)
+            cache_data[root] = CacheEntry(
+                timestamp=time.time(),
+                repos=repos,
+                ttl=effective_ttl,
+            )
+            save_cache(cache_path, cache_data)
 
     if not repos:
         print(f"No git repositories found under {root}.", file=sys.stderr)
