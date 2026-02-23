@@ -114,12 +114,32 @@ def print_file_changes(files: List[str], show_full: bool, max_files: int) -> Non
     )
 
 
+def has_upstream() -> bool:
+    """Check if the current branch has an upstream tracking branch."""
+    try:
+        run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        return True
+    except RuntimeError:
+        return False
+
+
 def gather_push_preview(show_full: bool, max_files: int) -> None:
-    upstream = run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
-    ahead_behind = run_git(["rev-list", "--left-right", "--count", "@{u}...HEAD"])
-    commit_count = run_git(["rev-list", "--count", "@{u}..HEAD"])
-    commit_list = run_git(["log", "--oneline", "--decorate", "@{u}..HEAD"])
-    files_raw = run_git(["diff", "--name-status", "@{u}..HEAD"])
+    if has_upstream():
+        upstream = run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        ahead_behind = run_git(["rev-list", "--left-right", "--count", "@{u}...HEAD"])
+        commit_count = run_git(["rev-list", "--count", "@{u}..HEAD"])
+        commit_list = run_git(["log", "--oneline", "--decorate", "@{u}..HEAD"])
+        files_raw = run_git(["diff", "--name-status", "@{u}..HEAD"])
+    else:
+        branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+        upstream = f"(no upstream; showing all commits on {branch})"
+        commit_count = run_git(["rev-list", "--count", "HEAD"])
+        ahead_behind = f"0\t{commit_count}"
+        commit_list = run_git(["log", "--oneline", "--decorate"])
+        # Show files changed across all commits
+        root_tree = run_git(["hash-object", "-t", "tree", "/dev/null"])
+        files_raw = run_git(["diff", "--name-status", root_tree, "HEAD"])
+
     files_changed = [line for line in files_raw.splitlines() if line.strip()]
 
     print_header(upstream, ahead_behind, commit_count)
