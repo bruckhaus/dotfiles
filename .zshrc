@@ -38,6 +38,8 @@ git_push_preview() {
   python3 "$helper" "$@"
 }
 
+export GIT_GO_ROOTS="$HOME/dev:$HOME/Documents/dev"
+
 git_go() {
   local dotfiles_root="${DOTFILES_REPO:-$HOME/dev/dotfiles}"
   local helper="$dotfiles_root/scripts/git_go.py"

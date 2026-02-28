@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Interactive helper for jumping between git repositories under ~/dev."""
+"""Interactive helper for jumping between git repositories under one or more roots."""
 
 from __future__ import annotations
 
@@ -62,7 +62,7 @@ def filter_repos(repos: Sequence[str], tokens: Sequence[str]) -> List[str]:
     filtered = list(repos)
     for token in tokens:
         lowered = token.lower()
-        filtered = [repo for repo in filtered if lowered in repo.lower()]
+        filtered = [repo for repo in filtered if lowered in os.path.basename(repo).lower()]
     return filtered
 
 
@@ -137,7 +137,10 @@ def choose_repo(repos: Sequence[str], tokens: Sequence[str], root: str) -> str:
 
 def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Locate git repositories under ~/dev (or a custom root)."
+        description=(
+            "Locate git repositories under one or more root directories. "
+            "Set GIT_GO_ROOTS (colon-separated paths) to scan multiple roots."
+        )
     )
     parser.add_argument(
         "query",
@@ -147,7 +150,10 @@ def parse_args(argv: Iterable[str]) -> argparse.Namespace:
     parser.add_argument(
         "--root",
         default=os.path.expanduser(os.environ.get("GIT_GO_ROOT", "~/dev")),
-        help="Root directory to scan (default: %(default)s).",
+        help=(
+            "Single root directory to scan (default: %(default)s). "
+            "Ignored when GIT_GO_ROOTS is set."
+        ),
     )
     parser.add_argument(
         "--list",
@@ -240,57 +246,81 @@ def determine_effective_ttl(args: argparse.Namespace, entry: CacheEntry | None) 
     return DEFAULT_CACHE_TTL
 
 
+def resolve_roots(args: argparse.Namespace) -> List[str]:
+    """Return a list of absolute, existing root directories to scan."""
+    env_roots = os.environ.get("GIT_GO_ROOTS", "").strip()
+    if env_roots:
+        raw = [r.strip() for r in env_roots.split(":") if r.strip()]
+    else:
+        raw = [args.root]
+    return [
+        os.path.abspath(os.path.expanduser(r))
+        for r in raw
+        if os.path.isdir(os.path.expanduser(r))
+    ]
+
+
 def main(argv: Iterable[str]) -> int:
     args = parse_args(argv)
-    root = os.path.abspath(os.path.expanduser(args.root))
 
-    if not os.path.isdir(root):
-        print(f"Root directory '{root}' does not exist.", file=sys.stderr)
+    roots = resolve_roots(args)
+    if not roots:
+        print("No valid root directories found.", file=sys.stderr)
         return 1
+
+    # When scanning multiple roots, display paths relative to ~ so the user
+    # can easily tell which tree each repo lives in (e.g. dev/foo vs
+    # Documents/dev/bar).
+    display_root = os.path.expanduser("~") if len(roots) > 1 else roots[0]
 
     cache_path = os.path.expanduser(args.cache_file)
     cache_data: CacheData = {}
-    repos: List[str] | None = None
-    cache_entry: CacheEntry | None = None
 
     if not args.no_cache:
         cache_data = load_cache(cache_path)
-        cache_entry = cache_data.get(root)
 
-    effective_ttl = determine_effective_ttl(args, cache_entry)
+    all_repos: List[str] = []
 
-    if not args.no_cache and args.cache_ttl is not None and cache_entry:
-        if cache_entry.get("ttl") != args.cache_ttl:
-            cache_entry["ttl"] = args.cache_ttl
-            cache_data[root] = cache_entry
-            save_cache(cache_path, cache_data)
+    for root in roots:
+        cache_entry: CacheEntry | None = cache_data.get(root)
+        effective_ttl = determine_effective_ttl(args, cache_entry)
 
-    if not args.no_cache and not args.refresh_cache:
-        repos = get_cached_repos(cache_data, root, effective_ttl)
+        if not args.no_cache and args.cache_ttl is not None and cache_entry:
+            if cache_entry.get("ttl") != args.cache_ttl:
+                cache_entry["ttl"] = args.cache_ttl
+                cache_data[root] = cache_entry
+                save_cache(cache_path, cache_data)
 
-    if repos is None:
-        repos = find_git_repos(root)
-        if not args.no_cache:
-            cache_data[root] = CacheEntry(
-                timestamp=time.time(),
-                repos=repos,
-                ttl=effective_ttl,
-            )
-            save_cache(cache_path, cache_data)
+        repos: List[str] | None = None
+        if not args.no_cache and not args.refresh_cache:
+            repos = get_cached_repos(cache_data, root, effective_ttl)
 
-    if not repos:
-        print(f"No git repositories found under {root}.", file=sys.stderr)
+        if repos is None:
+            repos = find_git_repos(root)
+            if not args.no_cache:
+                cache_data[root] = CacheEntry(
+                    timestamp=time.time(),
+                    repos=repos,
+                    ttl=effective_ttl,
+                )
+                save_cache(cache_path, cache_data)
+
+        all_repos.extend(repos)
+
+    if not all_repos:
+        roots_str = ", ".join(roots)
+        print(f"No git repositories found under {roots_str}.", file=sys.stderr)
         return 1
 
     if args.list:
-        for repo in repos:
-            print(format_repo(repo, root))
+        for repo in all_repos:
+            print(format_repo(repo, display_root))
         return 0
 
     if args.no_fzf:
-        selection = pick_with_menu(filter_repos(repos, args.query), root)
+        selection = pick_with_menu(filter_repos(all_repos, args.query), display_root)
     else:
-        selection = choose_repo(repos, args.query, root)
+        selection = choose_repo(all_repos, args.query, display_root)
 
     print(selection)
     return 0
