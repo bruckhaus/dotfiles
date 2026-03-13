@@ -5,6 +5,7 @@ dotfiles:
   - .gitconfig
   - .zshrc
   - .config/wezterm
+  - .config/ghostty/config
   - .config/starship.toml
   - .env.example
   - .env.local
