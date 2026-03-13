@@ -49,9 +49,11 @@ class StarshipInstaller:
             self.log(f"Starship is already installed.", style="green")
             changes = self.ensure_proper_initialization(dry_run)
             # Install Nerd Font if needed
-            changes |= self.install_nerd_font(dry_run)
-            # Ask about icon rendering and offer no-nerd-font preset if needed
-            changes |= self.check_icon_rendering(dry_run)
+            font_installed = self.install_nerd_font(dry_run)
+            changes |= font_installed
+            # Only ask about icon rendering when a font was just installed
+            if font_installed:
+                changes |= self.check_icon_rendering(dry_run)
             return changes
         
         if dry_run:
@@ -78,10 +80,12 @@ class StarshipInstaller:
         changes = self.ensure_proper_initialization(dry_run=False)
         
         # Install Nerd Font
-        changes |= self.install_nerd_font(dry_run=False)
-        
-        # Ask about icon rendering and offer no-nerd-font preset if needed
-        changes |= self.check_icon_rendering(dry_run=False)
+        font_installed = self.install_nerd_font(dry_run=False)
+        changes |= font_installed
+
+        # Ask about icon rendering only when a font was just installed
+        if font_installed:
+            changes |= self.check_icon_rendering(dry_run=False)
         
         self.log(f"Starship installed successfully!", style="green")
         return True
