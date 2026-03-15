@@ -1,5 +1,5 @@
 font-family = JetBrains Mono
 font-style = Bold
-font-size = 18
+font-size = 20
 
-scroll-to-bottom = keystroke,no-output
+scroll-to-bottom = no-output
