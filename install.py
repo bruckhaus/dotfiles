@@ -684,19 +684,37 @@ try:
     class InstallStarshipCommand(Command):
         def __init__(self):
             self.installer = StarshipInstaller(console=console)
-        
+
         def execute(self, dry_run=False):
             return self.installer.execute(dry_run=dry_run)
 except ImportError:
-    # Fallback if the module is not available
     console.print("[yellow]Warning: starship_installer module not found. Skipping Starship installation.[/yellow]")
-    
+
     class InstallStarshipCommand(Command):
         def __init__(self):
             pass
-        
+
         def execute(self, dry_run=False):
             console.print("[yellow]Starship installer module not found. Please run 'install_starship.py' separately.[/yellow]")
+            return False
+
+try:
+    from installers.ghostty_installer import GhosttyInstaller
+
+    class CleanupGhosttyCommand(Command):
+        def __init__(self):
+            self.installer = GhosttyInstaller(console=console)
+
+        def execute(self, dry_run=False):
+            return self.installer.execute(dry_run=dry_run)
+except ImportError:
+    console.print("[yellow]Warning: ghostty_installer module not found. Skipping Ghostty cleanup.[/yellow]")
+
+    class CleanupGhosttyCommand(Command):
+        def __init__(self):
+            pass
+
+        def execute(self, dry_run=False):
             return False
 
 def main():
@@ -723,6 +741,7 @@ def main():
             InstallHubCommand(),
             InstallPythonVenvCommand(),
             InstallStarshipCommand(),
+            CleanupGhosttyCommand(),
             SetupEnvironmentFilesCommand(config),
             InstallDotfilesCommand(config),
             GenerateWrapperScriptsCommand(config),
